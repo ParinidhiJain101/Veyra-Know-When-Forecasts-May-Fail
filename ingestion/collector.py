@@ -128,6 +128,8 @@ class GEFSCollector:
         location_name: str = "delhi",
         variables: Optional[List[str]] = None,
         forecast_days: int = 10,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
         issue_time: Optional[Union[str, datetime]] = None,
         use_cache: bool = False,
     ) -> Tuple[Dict[str, Any], Path, Path, Dict[str, Any]]:
@@ -138,24 +140,28 @@ class GEFSCollector:
             variables = ["temperature_2m", "surface_pressure", "wind_speed_10m"]
 
         now_utc = datetime.now(timezone.utc)
-        date_str = now_utc.strftime("%Y%m%d")
-        dest_dir = self.raw_dir / location_name / date_str
+        sub_folder = f"{start_date}_{end_date}" if start_date and end_date else now_utc.strftime("%Y%m%d")
+        dest_dir = self.raw_dir / location_name / sub_folder
         dest_dir.mkdir(parents=True, exist_ok=True)
 
         if use_cache:
             existing_files = list(dest_dir.glob("gefs_raw_*.json"))
             existing_data_files = [f for f in existing_files if not f.name.endswith("_manifest.json") and not f.name.endswith("_status.json")]
-            if existing_data_files:
-                latest_raw = sorted(existing_data_files)[-1]
-                manifest_path = latest_raw.parent / f"{latest_raw.stem}_manifest.json"
-                if manifest_path.exists():
-                    with open(latest_raw, "r", encoding="utf-8") as f:
-                        raw_data = json.load(f)
-                    with open(manifest_path, "r", encoding="utf-8") as f:
-                        manifest = json.load(f)
-                    time_series = raw_data.get("hourly", {}).get("time", [])
-                    if len(time_series) >= (forecast_days * 24) and manifest.get("explicit_issue_time_utc"):
-                        return raw_data, latest_raw, manifest_path, manifest
+            # Sort newest first to check latest matching cache
+            for raw_f in sorted(existing_data_files, reverse=True):
+                man_p = raw_f.parent / f"{raw_f.stem}_manifest.json"
+                if man_p.exists():
+                    try:
+                        with open(raw_f, "r", encoding="utf-8") as f:
+                            cached_raw = json.load(f)
+                        with open(man_p, "r", encoding="utf-8") as f:
+                            cached_man = json.load(f)
+                        t_series = cached_raw.get("hourly", {}).get("time", [])
+                        min_required = (forecast_days * 24) if not (start_date and end_date) else 24
+                        if len(t_series) >= min_required and cached_man.get("explicit_issue_time_utc"):
+                            return cached_raw, raw_f, man_p, cached_man
+                    except Exception:
+                        continue
 
         # 1. Authoritative Issue Time Retrieval
         if issue_time is not None:
@@ -176,12 +182,17 @@ class GEFSCollector:
 
         # 2. Build and execute query
         vars_param = ",".join(variables)
+        if start_date and end_date:
+            date_params = f"&start_date={start_date}&end_date={end_date}"
+        else:
+            date_params = f"&forecast_days={forecast_days}"
+
         params = (
             f"?latitude={latitude:.4f}"
             f"&longitude={longitude:.4f}"
             f"&hourly={vars_param}"
             f"&models={self.model}"
-            f"&forecast_days={forecast_days}"
+            f"{date_params}"
         )
         url = f"{self.DEFAULT_BASE_URL}{params}"
 
