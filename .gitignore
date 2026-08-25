@@ -75,3 +75,16 @@ venv.bak/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Data directories & large datasets
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+*.nc
+*.grib
+*.grib2
+*.parquet
+*.h5
+*.hdf5
+
