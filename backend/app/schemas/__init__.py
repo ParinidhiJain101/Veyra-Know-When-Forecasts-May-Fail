@@ -1,4 +1,4 @@
-"""Schemas package."""
+"""Schemas package exporting API and Data contracts."""
 from backend.app.schemas.health import HealthResponse
 from backend.app.schemas.prediction import (
     PredictionRequest,
@@ -7,12 +7,18 @@ from backend.app.schemas.prediction import (
     RiskLevel,
     TrustState,
 )
+from backend.app.schemas.weather import (
+    CanonicalForecastDataset,
+    CanonicalForecastRecord,
+)
 
 __all__ = [
     "HealthResponse",
     "PredictionRequest",
     "PredictionResponse",
-    "RiskLevel",
     "TrustState",
+    "RiskLevel",
     "ReasonCode",
+    "CanonicalForecastRecord",
+    "CanonicalForecastDataset",
 ]

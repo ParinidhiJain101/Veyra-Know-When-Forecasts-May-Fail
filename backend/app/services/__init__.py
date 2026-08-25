@@ -1,4 +1,4 @@
-"""Services package exporting base interfaces and default implementations."""
+"""Services package exporting base interfaces and concrete implementations."""
 from backend.app.services.base import (
     BaseFeatureService,
     BaseModelService,
@@ -11,6 +11,7 @@ from backend.app.services.base import (
 )
 from backend.app.services.feature_service import UnavailableFeatureService
 from backend.app.services.model_service import UnavailableModelService
+from backend.app.services.openmeteo_service import OpenMeteoGEFSWeatherService
 from backend.app.services.weather_service import UnavailableWeatherService
 
 __all__ = [
@@ -23,6 +24,7 @@ __all__ = [
     "FeatureResult",
     "ModelResult",
     "UnavailableWeatherService",
+    "OpenMeteoGEFSWeatherService",
     "UnavailableFeatureService",
     "UnavailableModelService",
 ]
