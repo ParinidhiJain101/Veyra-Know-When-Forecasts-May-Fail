@@ -24,13 +24,20 @@ class RiskLevel(str, Enum):
 
 
 class ReasonCode(str, Enum):
-    """Standardized reason codes explaining trust state and abstention."""
+    """Standardized reason codes explaining trust state, pipeline status, and abstention."""
 
-    MODEL_NOT_READY = "MODEL_NOT_READY"
+    DATA_NOT_READY = "DATA_NOT_READY"
     DATA_UNAVAILABLE = "DATA_UNAVAILABLE"
+    FEATURES_NOT_READY = "FEATURES_NOT_READY"
+    MODEL_NOT_READY = "MODEL_NOT_READY"
+    MODEL_UNAVAILABLE = "MODEL_UNAVAILABLE"
+    INVALID_LOCATION = "INVALID_LOCATION"
+    QC_FAILED = "QC_FAILED"
+    OOD_ABSTAIN = "OOD_ABSTAIN"
     OOD_DETECTED = "OOD_DETECTED"
     INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
     EXTREME_VOLATILITY = "EXTREME_VOLATILITY"
+    INTERNAL_ERROR = "INTERNAL_ERROR"
     SUCCESS = "SUCCESS"
 
 

@@ -56,3 +56,24 @@ def test_prediction_response_json_serialization():
     assert data["bust_probability"] is None
     assert data["trust_state"] == "UNAVAILABLE"
     assert data["abstain"] is True
+
+
+def test_standardized_reason_codes_exist():
+    """Verify that all standardized Day 2 reason codes exist in ReasonCode enum."""
+    expected_codes = {
+        "DATA_NOT_READY",
+        "DATA_UNAVAILABLE",
+        "FEATURES_NOT_READY",
+        "MODEL_NOT_READY",
+        "MODEL_UNAVAILABLE",
+        "INVALID_LOCATION",
+        "QC_FAILED",
+        "OOD_ABSTAIN",
+        "OOD_DETECTED",
+        "INSUFFICIENT_DATA",
+        "EXTREME_VOLATILITY",
+        "INTERNAL_ERROR",
+        "SUCCESS",
+    }
+    actual_codes = {code.value for code in ReasonCode}
+    assert expected_codes.issubset(actual_codes)
