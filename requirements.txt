@@ -1,0 +1,7 @@
+# Builder 2 Day 1: Forecast Data Foundation minimal dependencies
+requests>=2.31.0
+pandas>=2.0.0
+numpy>=1.24.0
+pyarrow>=14.0.0
+pyyaml>=6.0.0
+pytest>=7.0.0
