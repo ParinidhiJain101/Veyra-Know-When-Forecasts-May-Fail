@@ -39,6 +39,8 @@ data/processed/*
 !data/processed/.gitkeep
 data/historical/*
 !data/historical/.gitkeep
+data/features/*
+!data/features/.gitkeep
 data/cache/*
 !data/cache/.gitkeep
 
