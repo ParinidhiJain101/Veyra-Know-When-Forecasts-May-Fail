@@ -1,8 +1,8 @@
 """
 GEFS Forecast Ingestion Collector.
 
-Retrieves real medium-range forecast data from the NOAA Global Ensemble Forecast System (GEFS).
-Queries authoritative model status/registry for verified model-run initialization time before ingestion.
+Retrieves real medium-range and historical forecast data from the NOAA Global Ensemble Forecast System (GEFS).
+Queries authoritative NOAA GEFS cycle registry for verified model-run initialization times (for both live and historical dates).
 Preserves raw payload, status response, and metadata manifest immutably.
 """
 
@@ -12,7 +12,7 @@ import os
 import re
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -35,45 +35,55 @@ class GEFSCollector:
         self.model = model
         self.timeout_seconds = timeout_seconds
 
-    def query_model_status(self, target_date: Optional[datetime] = None) -> Tuple[datetime, Dict[str, Any]]:
+    def query_model_status(self, target_date: Optional[Union[str, datetime]] = None) -> Tuple[datetime, Dict[str, Any]]:
         """
         Query authoritative model status / run registry to obtain the verified initialization time.
 
-        First attempts Open-Meteo's model status endpoint. If unreachable or 500, queries
-        the authoritative NOAA NCEP GEFS registry directly.
+        For both live and historical dates, queries NOAA NCEP GEFS registry directly.
         Fails loudly if no authoritative status can be verified (no silent 00z fallback).
+
+        Args:
+            target_date: Target datetime or string (YYYY-MM-DD or YYYYMMDD). If None, defaults to current UTC time.
 
         Returns:
             Tuple of (verified_issue_datetime_utc, status_payload_dict).
         """
         now_utc = datetime.now(timezone.utc)
-        eval_date = target_date or now_utc
+        if target_date is None:
+            eval_date = now_utc
+        elif isinstance(target_date, str):
+            clean_date = target_date.replace("-", "")[:8]
+            eval_date = datetime.strptime(clean_date, "%Y%m%d").replace(tzinfo=timezone.utc)
+        else:
+            eval_date = target_date if target_date.tzinfo else target_date.replace(tzinfo=timezone.utc)
+
         date_str = eval_date.strftime("%Y%m%d")
 
-        # 1. Attempt Open-Meteo status endpoint
-        try:
-            req = urllib.request.Request(
-                self.OPENMETEO_STATUS_URL,
-                headers={"User-Agent": "ForecastBustSentinel/1.0 (Status Check)"},
-            )
-            with urllib.request.urlopen(req, timeout=self.timeout_seconds) as resp:
-                if resp.status == 200:
-                    status_data = json.loads(resp.read().decode("utf-8"))
-                    init_time_str = status_data.get("last_run_initialisation_time") or status_data.get("initialization_time")
-                    if init_time_str:
-                        init_dt = datetime.fromisoformat(init_time_str.replace("Z", "+00:00"))
-                        status_info = {
-                            "authoritative_source": "Open-Meteo Model Status API",
-                            "status_url": self.OPENMETEO_STATUS_URL,
-                            "raw_status_response": status_data,
-                            "verified_initialization_time_utc": init_dt.isoformat(),
-                            "query_timestamp_utc": now_utc.isoformat(),
-                        }
-                        return init_dt, status_info
-        except Exception:
-            pass  # Fall through to authoritative NOAA registry
+        # 1. If today's date, attempt Open-Meteo status endpoint first
+        if date_str == now_utc.strftime("%Y%m%d"):
+            try:
+                req = urllib.request.Request(
+                    self.OPENMETEO_STATUS_URL,
+                    headers={"User-Agent": "ForecastBustSentinel/1.0 (Status Check)"},
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    if resp.status == 200:
+                        status_data = json.loads(resp.read().decode("utf-8"))
+                        init_time_str = status_data.get("last_run_initialisation_time") or status_data.get("initialization_time")
+                        if init_time_str:
+                            init_dt = datetime.fromisoformat(init_time_str.replace("Z", "+00:00"))
+                            status_info = {
+                                "authoritative_source": "Open-Meteo Model Status API",
+                                "status_url": self.OPENMETEO_STATUS_URL,
+                                "raw_status_response": status_data,
+                                "verified_initialization_time_utc": init_dt.isoformat(),
+                                "query_timestamp_utc": now_utc.isoformat(),
+                            }
+                            return init_dt, status_info
+            except Exception:
+                pass  # Fall through to authoritative NOAA registry
 
-        # 2. Query authoritative NOAA NCEP GEFS Registry
+        # 2. Query authoritative NOAA NCEP GEFS S3 Registry for the target date
         s3_url = f"{self.NOAA_S3_REGISTRY_URL}{date_str}/&delimiter=/"
         try:
             req = urllib.request.Request(
@@ -82,11 +92,14 @@ class GEFSCollector:
             )
             with urllib.request.urlopen(req, timeout=self.timeout_seconds) as resp:
                 if resp.status != 200:
-                    raise RuntimeError(f"NOAA GEFS registry returned status {resp.status}")
+                    raise RuntimeError(f"NOAA GEFS registry returned status {resp.status} for date {date_str}")
                 content = resp.read().decode("utf-8")
                 cycles = re.findall(r"<Prefix>gefs\.\d{8}/(\d{2})/</Prefix>", content)
                 if not cycles:
-                    raise RuntimeError(f"No active GEFS cycles found on NOAA registry for date {date_str}")
+                    raise RuntimeError(
+                        f"No active GEFS cycles found on NOAA registry for date {date_str} (outside NOAA retention window). "
+                        "Per project integrity rules, no guessed 00z fallback is permitted."
+                    )
 
                 latest_cycle_hour = int(sorted(cycles)[-1])
                 init_dt = datetime(eval_date.year, eval_date.month, eval_date.day, latest_cycle_hour, 0, 0, tzinfo=timezone.utc)
@@ -117,9 +130,34 @@ class GEFSCollector:
                 return init_dt, status_info
         except Exception as e:
             raise RuntimeError(
-                f"Failed to obtain authoritative GEFS model-run status from Open-Meteo or NOAA registry for date {date_str}: {e}. "
+                f"Failed to obtain authoritative GEFS model-run status from NOAA registry for date {date_str}: {e}. "
                 "Per project integrity rules, no guessed/silent 00z fallback is permitted."
             ) from e
+
+    def query_range_cycles(self, start_date: str, end_date: str) -> Dict[str, Any]:
+        """Query and verify authoritative cycles for every date in a historical range."""
+        d_start = datetime.strptime(start_date.replace("-", "")[:8], "%Y%m%d")
+        d_end = datetime.strptime(end_date.replace("-", "")[:8], "%Y%m%d")
+        
+        results = {}
+        curr = d_start
+        while curr <= d_end:
+            ds = curr.strftime("%Y%m%d")
+            try:
+                _, s_info = self.query_model_status(curr)
+                results[ds] = {
+                    "status": "VERIFIED",
+                    "available_cycles": s_info["available_cycles"],
+                    "latest_cycle": s_info["selected_cycle"],
+                    "verified_initialization_time_utc": s_info["verified_initialization_time_utc"],
+                }
+            except Exception as e:
+                results[ds] = {
+                    "status": "UNAVAILABLE",
+                    "error": str(e),
+                }
+            curr += timedelta(days=1)
+        return results
 
     def fetch_forecast(
         self,
@@ -147,7 +185,6 @@ class GEFSCollector:
         if use_cache:
             existing_files = list(dest_dir.glob("gefs_raw_*.json"))
             existing_data_files = [f for f in existing_files if not f.name.endswith("_manifest.json") and not f.name.endswith("_status.json")]
-            # Sort newest first to check latest matching cache
             for raw_f in sorted(existing_data_files, reverse=True):
                 man_p = raw_f.parent / f"{raw_f.stem}_manifest.json"
                 if man_p.exists():
@@ -175,8 +212,14 @@ class GEFSCollector:
                 "query_timestamp_utc": now_utc.isoformat(),
             }
         else:
-            # Query authoritative status/registry (fails loudly if unreachable)
-            verified_issue_dt, status_info = self.query_model_status(now_utc)
+            # Query authoritative status/registry for start_date (or today if live)
+            target_eval = start_date if start_date else now_utc
+            verified_issue_dt, status_info = self.query_model_status(target_eval)
+            
+            # If historical range, also verify all individual dates in the range
+            if start_date and end_date:
+                range_details = self.query_range_cycles(start_date, end_date)
+                status_info["range_verification_details"] = range_details
 
         explicit_issue_iso = verified_issue_dt.isoformat()
 
@@ -259,7 +302,8 @@ class GEFSCollector:
                 "elevation": raw_data.get("elevation"),
             },
             "variables_requested": variables,
-            "requested_horizon_days": forecast_days,
+            "requested_horizon_days": forecast_days if not (start_date and end_date) else None,
+            "date_range": {"start_date": start_date, "end_date": end_date} if start_date and end_date else None,
             "actual_returned_horizon_hours": actual_horizon_hours,
             "actual_lead_hours_min": 0,
             "actual_lead_hours_max": actual_horizon_hours - 1 if actual_horizon_hours > 0 else 0,

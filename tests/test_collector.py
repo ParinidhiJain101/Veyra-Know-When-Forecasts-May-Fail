@@ -55,6 +55,31 @@ def test_authoritative_status_failure_raises_loudly():
             collector.query_model_status(datetime(2026, 8, 25, tzinfo=timezone.utc))
 
 
+def test_query_range_cycles_historical():
+    """Test querying and verifying cycles for a historical date range."""
+    collector = GEFSCollector()
+    mock_s3_xml = """<?xml version="1.0" encoding="UTF-8"?>
+    <ListBucketResult>
+        <Prefix>gefs.20260820/</Prefix>
+        <CommonPrefixes><Prefix>gefs.20260820/00/</Prefix></CommonPrefixes>
+        <CommonPrefixes><Prefix>gefs.20260820/06/</Prefix></CommonPrefixes>
+        <CommonPrefixes><Prefix>gefs.20260820/12/</Prefix></CommonPrefixes>
+        <CommonPrefixes><Prefix>gefs.20260820/18/</Prefix></CommonPrefixes>
+    </ListBucketResult>
+    """
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.read.return_value = mock_s3_xml.encode("utf-8")
+    mock_resp.__enter__.return_value = mock_resp
+
+    with patch("urllib.request.urlopen", return_value=mock_resp):
+        range_results = collector.query_range_cycles("2026-08-20", "2026-08-20")
+        assert "20260820" in range_results
+        assert range_results["20260820"]["status"] == "VERIFIED"
+        assert range_results["20260820"]["latest_cycle"] == "18z"
+        assert range_results["20260820"]["available_cycles"] == ["00", "06", "12", "18"]
+
+
 def test_fetch_forecast_saves_status_json(tmp_path):
     """Test that fetch_forecast records raw status json alongside raw data and manifest."""
     collector = GEFSCollector(raw_dir=str(tmp_path))

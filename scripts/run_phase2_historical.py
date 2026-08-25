@@ -45,23 +45,26 @@ def run_historical_alignment(
     print(f"Cache Mode       : {'Reusing local cache if available' if use_cache else 'Live download from source endpoints'}")
     print("-" * 75)
 
-    # 1. Ingest Historical GEFS Forecast
-    print("\n[STEP 1/5] INGESTION — Fetching Historical GEFS Forecast...")
+    # 1. Ingest Historical GEFS Forecast (with authoritative per-date NOAA registry verification)
+    print("\n[STEP 1/5] INGESTION — Fetching Historical GEFS Forecast & Verifying Registry Cycles...")
     gefs_collector = GEFSCollector()
     try:
-        # For historical runs, query start_date cycle
-        issue_time_anchor = f"{start_date}T00:00:00+00:00"
         raw_gefs, raw_gefs_path, gefs_manifest_path, gefs_manifest = gefs_collector.fetch_forecast(
             latitude=latitude,
             longitude=longitude,
             location_name=location_name,
             start_date=start_date,
             end_date=end_date,
-            issue_time=issue_time_anchor,
             use_cache=use_cache,
         )
         print(f"  [OK] Historical GEFS raw preserved : {raw_gefs_path}")
-        print(f"  [OK] Explicit Issue Time           : {gefs_manifest.get('explicit_issue_time_utc')}")
+        print(f"  [OK] Verified Issue Time           : {gefs_manifest.get('explicit_issue_time_utc')}")
+        print(f"  [OK] Issue Time Source             : {gefs_manifest.get('issue_time_source')}")
+        status_details = gefs_manifest.get("authoritative_cycle_details", {})
+        if "range_verification_details" in status_details:
+            print("  [OK] Per-Date Registry Verification Summary:")
+            for ds, info in status_details["range_verification_details"].items():
+                print(f"      - {ds}: {info.get('status')} (Available: {info.get('available_cycles')}, Latest: {info.get('latest_cycle')})")
     except Exception as e:
         print(f"[ERROR] Failed to ingest historical GEFS data: {e}", file=sys.stderr)
         return 1

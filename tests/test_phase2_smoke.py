@@ -25,7 +25,7 @@ def test_real_historical_alignment_smoke():
     end_date = "2026-08-24"
     location = "delhi"
 
-    # 1. Ingest/Load Historical GEFS Forecast
+    # 1. Ingest/Load Historical GEFS Forecast with authoritative registry verification
     gefs_collector = GEFSCollector(raw_dir="data/raw/gefs")
     raw_gefs, raw_gefs_p, gefs_manifest_p, gefs_manifest = gefs_collector.fetch_forecast(
         latitude=28.6139,
@@ -33,11 +33,13 @@ def test_real_historical_alignment_smoke():
         location_name=location,
         start_date=start_date,
         end_date=end_date,
-        issue_time=f"{start_date}T00:00:00+00:00",
-        use_cache=True,
+        use_cache=False,  # Re-verify and re-download fresh to prove registry check
     )
     assert raw_gefs_p.exists()
     assert gefs_manifest_p.exists()
+    assert gefs_manifest["issue_time_source"] == "NOAA NCEP GEFS AWS S3 Open Data Registry"
+    assert "authoritative_cycle_details" in gefs_manifest
+    assert gefs_manifest["authoritative_cycle_details"]["selected_cycle"] == "18z"
 
     # 2. Ingest/Load Historical ERA5 Truth Reference
     era5_collector = ERA5ReferenceCollector(raw_dir="data/raw/era5")
