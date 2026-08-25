@@ -1,6 +1,18 @@
-"""Tests for POST /v1/predict endpoint."""
+"""Tests for POST /v1/predict endpoint and FastAPI dependency injection."""
 import pytest
 from fastapi.testclient import TestClient
+from backend.app.agents.forecast_bust_agent import ForecastBustAgent
+from backend.app.api.v1.endpoints.predict import get_forecast_bust_agent
+from backend.app.main import app
+from backend.app.schemas.prediction import ReasonCode, RiskLevel, TrustState
+from backend.app.services.base import (
+    BaseFeatureService,
+    BaseModelService,
+    BaseWeatherService,
+    FeatureResult,
+    ModelResult,
+    WeatherResult,
+)
 
 
 def test_predict_valid_location_accepted(client: TestClient):
@@ -70,3 +82,40 @@ def test_predict_invalid_request_rejected(client: TestClient, invalid_payload: d
     """Test that invalid/empty requests are rejected with HTTP 422 Unprocessable Entity."""
     response = client.post("/v1/predict", json=invalid_payload)
     assert response.status_code == 422
+
+
+def test_predict_dependency_injection_override(client: TestClient):
+    """Test that FastAPI dependency override allows injecting a custom test agent."""
+
+    class MockWeather(BaseWeatherService):
+        def get_forecast(self, location: str, target_date=None) -> WeatherResult:
+            return WeatherResult(location=location, is_available=True, data_version="gefs-v1.0")
+
+    class MockFeature(BaseFeatureService):
+        def build_features(self, weather_result: WeatherResult) -> FeatureResult:
+            return FeatureResult(location=weather_result.location, is_ready=True)
+
+    class MockModel(BaseModelService):
+        def predict(self, feature_result: FeatureResult) -> ModelResult:
+            return ModelResult(probability=0.15, model_version="lgbm-calibrated-v1", is_ready=True)
+
+    custom_agent = ForecastBustAgent(
+        weather_service=MockWeather(),
+        feature_service=MockFeature(),
+        model_service=MockModel(),
+    )
+
+    app.dependency_overrides[get_forecast_bust_agent] = lambda: custom_agent
+    try:
+        response = client.post("/v1/predict", json={"location": "Geneva"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["location"] == "Geneva"
+        assert data["bust_probability"] == 0.15
+        assert data["risk_level"] == "LOW"
+        assert data["trust_state"] == "HIGH_CONFIDENCE"
+        assert data["abstain"] is False
+        assert data["model_version"] == "lgbm-calibrated-v1"
+        assert data["data_version"] == "gefs-v1.0"
+    finally:
+        app.dependency_overrides.clear()
