@@ -41,7 +41,12 @@ from backend.app.services.base import FeatureResult, ModelResult, WeatherResult
 from backend.app.services.openmeteo_service import OpenMeteoGEFSWeatherService
 
 # Reference model artifact path
-B2_MODEL_DIR = Path(r"c:/Users/parin/OneDrive/Desktop/forecast-bust-sentinel/models/day4")
+B2_MODEL_DIR = Path(
+    os.getenv(
+        "BUILDER2_MODEL_DIR",
+        str(Path(__file__).resolve().parents[3] / "forecast-bust-sentinel" / "models" / "day4"),
+    )
+)
 
 
 # =====================================================================
