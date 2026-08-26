@@ -81,10 +81,15 @@ data/raw/*
 !data/raw/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+data/historical/*
+!data/historical/.gitkeep
+data/training/*
+!data/training/.gitkeep
 *.nc
 *.grib
 *.grib2
 *.parquet
 *.h5
 *.hdf5
+
 
