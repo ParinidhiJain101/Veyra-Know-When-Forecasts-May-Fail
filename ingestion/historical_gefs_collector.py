@@ -288,3 +288,76 @@ class HistoricalGEFSCollector:
             json.dump(manifest, f, indent=2)
 
         return df_forecast, manifest, raw_file_path, manifest_file_path
+
+    def collect_multi_cycle(
+        self,
+        start_date: str = "2026-08-18",
+        end_date: str = "2026-08-24",
+        cycles: Optional[List[str]] = None,
+        horizon_hours: int = 72,
+        step_hours: int = 3,
+        latitude: float = 28.6139,
+        longitude: float = 77.2090,
+        location_name: str = "delhi",
+        use_cache: bool = True,
+    ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+        """
+        Collect historical GEFS ensemble forecasts across multiple daily cycles (e.g. 00Z, 06Z, 12Z, 18Z).
+
+        Args:
+            start_date: Start date string (YYYY-MM-DD).
+            end_date: End date string (YYYY-MM-DD).
+            cycles: List of cycle strings (e.g. ['00', '06', '12', '18']). Defaults to all 4 daily cycles.
+            horizon_hours: Max forecast horizon in hours.
+            step_hours: Step interval in hours between lead steps.
+            latitude: Latitude of target location.
+            longitude: Longitude of target location.
+            location_name: Location identifier.
+            use_cache: If True, reuse local extraction cache.
+
+        Returns:
+            Tuple of (combined_multi_cycle_df, multi_cycle_manifest_dict).
+        """
+        if cycles is None:
+            cycles = ["00", "06", "12", "18"]
+
+        now_utc = datetime.now(timezone.utc)
+        dfs = []
+        cycle_manifests = {}
+
+        for c in sorted(cycles):
+            clean_c = c.replace("z", "").replace("Z", "").zfill(2)
+            df_c, man_c, _, _ = self.collect_range(
+                start_date=start_date,
+                end_date=end_date,
+                cycle=clean_c,
+                horizon_hours=horizon_hours,
+                step_hours=step_hours,
+                latitude=latitude,
+                longitude=longitude,
+                location_name=location_name,
+                use_cache=use_cache,
+            )
+            dfs.append(df_c)
+            cycle_manifests[f"{clean_c}z"] = man_c
+
+        combined_df = pd.concat(dfs, ignore_index=True)
+        # Drop duplicates on primary key
+        sort_keys = ["location", "variable", "issue_time", "valid_time"]
+        combined_df = combined_df.drop_duplicates(subset=sort_keys).sort_values(by=sort_keys).reset_index(drop=True)
+
+        manifest = {
+            "source": "NOAA NCEP GEFS AWS S3 Open Data (Multi-Cycle)",
+            "location_name": location_name,
+            "requested_coordinates": {"latitude": latitude, "longitude": longitude},
+            "start_date": start_date,
+            "end_date": end_date,
+            "cycles_requested": [f"{c.zfill(2)}z" for c in cycles],
+            "total_rows": len(combined_df),
+            "distinct_issue_times": int(combined_df["issue_time"].nunique()),
+            "distinct_valid_times": int(combined_df["valid_time"].nunique()),
+            "cycle_manifests": cycle_manifests,
+            "generation_time_utc": now_utc.isoformat(),
+        }
+
+        return combined_df, manifest

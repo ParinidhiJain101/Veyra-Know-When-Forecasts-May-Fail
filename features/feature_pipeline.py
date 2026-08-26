@@ -88,6 +88,8 @@ class IssueTimeSafeFeaturePipeline:
         # Normalize column names if needed
         if "value" in df.columns and "forecast_value" not in df.columns:
             df["forecast_value"] = df["value"]
+        if "ensemble_std" not in df.columns:
+            df["ensemble_std"] = np.nan
 
         # Ensure datetime types
         df["valid_time"] = pd.to_datetime(df["valid_time"], utc=True)
