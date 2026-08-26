@@ -16,6 +16,7 @@ from models.logistic_classifier import RegularizedLogisticClassifier
 from models.tree_classifier import LightGBMBustClassifier
 from models.calibrator import ProbabilityCalibrator
 from models.evaluator import ModelEvaluator
+from models.model_service import ForecastBustModelService
 
 __all__ = [
     "ChronologicalDataSplitter",
@@ -28,4 +29,5 @@ __all__ = [
     "LightGBMBustClassifier",
     "ProbabilityCalibrator",
     "ModelEvaluator",
+    "ForecastBustModelService",
 ]
