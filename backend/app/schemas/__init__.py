@@ -7,6 +7,10 @@ from backend.app.schemas.prediction import (
     RiskLevel,
     TrustState,
 )
+from backend.app.schemas.reference import (
+    ReferenceWeatherDataset,
+    ReferenceWeatherRecord,
+)
 from backend.app.schemas.weather import (
     CanonicalForecastDataset,
     CanonicalForecastRecord,
@@ -21,4 +25,6 @@ __all__ = [
     "ReasonCode",
     "CanonicalForecastRecord",
     "CanonicalForecastDataset",
+    "ReferenceWeatherRecord",
+    "ReferenceWeatherDataset",
 ]
