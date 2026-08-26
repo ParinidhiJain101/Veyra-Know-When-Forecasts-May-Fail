@@ -1,5 +1,5 @@
 """
-Deterministic Physical Feature Attribution & Explainer Engine (Day 6).
+Deterministic Physical Feature Attribution & Explainer Engine.
 
 Identifies and ranks the primary physical drivers of forecast bust risk
 (dispersion, inter-cycle revisions, lead degradation) without generating

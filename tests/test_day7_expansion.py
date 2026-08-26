@@ -1,5 +1,5 @@
 """
-Day 7 Scientific Expansion Test Suite.
+Multi-Location Multi-Cycle Forecast Instability Test Suite.
 
 Tests:
 1. LocationRegistry candidate expansion (20 Indian locations) & spatial colocation.

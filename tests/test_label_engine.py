@@ -1,5 +1,5 @@
 """
-Unit tests for Bust Label Engine (Phase 3).
+Unit tests for Bust Label Engine.
 
 Tests:
 1. Training-period conditional q95 error threshold fitting

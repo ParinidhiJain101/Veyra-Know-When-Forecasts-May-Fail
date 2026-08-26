@@ -1,14 +1,11 @@
 """
-Location Registry and Spatial Colocation Service (Day 6).
+Location Registry and Spatial Colocation Service.
 
 Resolves requested geographic coordinates to actual NWP forecast grid points,
 computes explicit spatial mismatch distance (km), and manages regional groupings.
 
-SCIENTIFIC INTEGRITY RULE:
-- Delhi is the single verified historical NWP location in the current pilot dataset.
-- Other registered monitoring locations represent geographical entities. If actual
-  forecast grid coordinates are not supplied by the source dataset, actual_grid_coordinates
-  and spatial_distance_km remain unresolved (None) rather than fabricated.
+If actual forecast grid coordinates are not supplied by the source dataset,
+actual_grid_coordinates and spatial_distance_km remain unresolved (None).
 """
 
 import math

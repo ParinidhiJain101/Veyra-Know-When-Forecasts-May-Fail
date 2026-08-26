@@ -1,5 +1,5 @@
 """
-Unit tests for Automated Data Leakage Audit (Phase 3).
+Unit tests for Automated Data Leakage Audit.
 
 Tests:
 1. Clean pass on valid issue-time feature matrix

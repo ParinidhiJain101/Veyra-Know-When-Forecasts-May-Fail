@@ -1,12 +1,12 @@
 """
-Bust Label Engine (Phase 3).
+Bust Label Engine.
 
 Computes robust forecast bust labels from historical paired forecast-truth datasets.
 A forecast bust is defined when the forecast absolute error |forecast_value - truth_value|
 exceeds a conditional high-quantile error threshold (default: q95).
 
-SCIENTIFIC LEAKAGE INVARIANT:
-Thresholds MUST be fitted strictly on historical training data.
+Scientific Leakage Invariant:
+Thresholds must be fitted strictly on historical training data.
 Evaluation and test sets must apply the frozen training-period thresholds without re-fitting.
 """
 

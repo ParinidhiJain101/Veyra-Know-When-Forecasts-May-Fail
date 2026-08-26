@@ -1,11 +1,11 @@
 """
-Forecast Instability Fingerprint Engine (Day 7).
+Forecast Instability Fingerprint Engine.
 
 Constructs an interpretable, structured 6-group evidence fingerprint characterizing
 forecast instability, trajectory dynamics, ensemble dispersion, and horizon degradation.
 
-SCIENTIFIC INTEGRITY & DETERMINISM:
-- Does NOT invent an arbitrary composite 'magic score'.
+Scientific Integrity & Determinism:
+- Does not invent an arbitrary composite score.
 - Uses variable-specific physical tolerance thresholds.
 - Uses neutral UP/DOWN directional regime indicators.
 - Employs strict, deterministic regime precedence rules.

@@ -1,5 +1,5 @@
 """
-Real-Data Smoke Test for Builder 2 Day 1 Pipeline.
+Real-Data Smoke Test for GEFS Forecast Pipeline.
 
 Validates the full medium-range chain with real NOAA GEFS data and verified issue time:
 GEFS Source -> Authoritative Status Query -> Raw Preservation & Manifest -> Standardization -> QC -> Structured DataFrame.

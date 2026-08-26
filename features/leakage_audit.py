@@ -1,12 +1,12 @@
 """
-Automated Data Leakage Audit (Phase 3).
+Automated Data Leakage Audit.
 
 Validates that feature matrices strictly adhere to the operational issue-time constraint:
     availability_time <= issue_time
 
-SCIENTIFIC RULE:
+Scientific Safeguard:
 Verification observations, ERA5 reanalysis truth, forecast errors, and bust labels
-must NEVER enter the live feature set. Any leakage violation raises DataLeakageError.
+must never enter the live feature set. Any leakage violation raises DataLeakageError.
 """
 
 from datetime import datetime, timezone

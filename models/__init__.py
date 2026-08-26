@@ -1,5 +1,5 @@
 """
-Forecast-Bust Sentinel — Day 4 ML Modeling Package.
+Forecast-Bust Sentinel — ML Modeling Package.
 
 Provides issue-time-safe classifiers, baselines, splitters, calibrators, and evaluators
 for predicting medium-range forecast bust risk.

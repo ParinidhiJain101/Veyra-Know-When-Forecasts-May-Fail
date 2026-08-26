@@ -1,5 +1,5 @@
 """
-Unit tests for Historical Forecast / ERA5 Reference Alignment Engine (Phase 2).
+Unit tests for Historical Forecast / ERA5 Reference Alignment Engine.
 
 Tests:
 1. Time alignment on (location, variable, valid_time)

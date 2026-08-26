@@ -1,5 +1,5 @@
 """
-Production Inference Service for Forecast-Bust Sentinel (Day 5).
+Production Inference Service for Forecast-Bust Sentinel.
 
 Provides a stable, versioned, and leakage-safe prediction service
 wrapping the trained LightGBM model and Platt Sigmoid calibrator.

@@ -1,5 +1,5 @@
 """
-Day 1 Pipeline Execution Script — Forecast Data Foundation.
+Forecast Data Ingestion & Standardization Pipeline Runner.
 
 Executes end-to-end:
 Location (Delhi) -> Real NOAA GEFS Ingestion (Medium-Range 10-day) ->

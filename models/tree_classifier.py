@@ -1,5 +1,5 @@
 """
-Conservative Gradient-Boosted Tree Classifier for Bust Prediction (Day 4).
+Conservative Gradient-Boosted Tree Classifier for Bust Prediction.
 
 Uses LightGBM native C-engine (lightgbm.train) with native NaN handling, constrained tree depth,
 and scale_pos_weight specifically configured to prevent overfitting on small sample sizes.

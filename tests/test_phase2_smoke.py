@@ -1,5 +1,5 @@
 """
-Phase 2 Real-Data Smoke Test — Historical Forecast & ERA5 Verification Alignment.
+Real-Data Smoke Test — Historical Forecast & ERA5 Verification Alignment.
 
 Tests the full historical chain on real data:
 Historical GEFS Ingestion -> Historical ERA5 Ingestion -> Dual Standardization -> Alignment & Error Calculation -> Parquet Persistence.

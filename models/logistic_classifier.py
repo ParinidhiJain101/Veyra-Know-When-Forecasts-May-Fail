@@ -1,5 +1,5 @@
 """
-Regularized Logistic Regression Classifier with Explicit Imputation (Day 4).
+Regularized Logistic Regression Classifier with Explicit Imputation.
 
 Preprocesses numeric features with median imputation + missingness indicators,
 followed by standard scaling and regularized L2 logistic regression with balanced class weights.

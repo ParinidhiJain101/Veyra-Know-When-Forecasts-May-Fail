@@ -1,10 +1,10 @@
 """
-Extended Issue-Time-Safe Feature Pipeline with Full Revision & Acceleration Dynamics (Day 7).
+Extended Issue-Time-Safe Feature Pipeline with Full Revision & Acceleration Dynamics.
 
-Extracts both the canonical 26-feature baseline and the Day 7 experimental instability & revision
+Extracts both the canonical 26-feature baseline and experimental instability & revision
 dynamics features across multi-cycle (00Z, 06Z, 12Z, 18Z) and multi-location forecast datasets.
 
-SCIENTIFIC LEAKAGE & INTEGRITY INVARIANTS:
+Scientific Leakage & Integrity Invariants:
 1. Revisions compare forecasts for the IDENTICAL valid_time across different issue times (T - offset).
 2. Never subtract adjacent lead times within the same cycle run.
 3. If any required prior cycle is missing, revision/acceleration strictly evaluates to NaN (never 0.0).
@@ -22,7 +22,7 @@ from features.feature_pipeline import (
     IssueTimeSafeFeaturePipeline,
 )
 
-# Experimental Day 7 feature columns (kept strictly isolated from canonical 26 features)
+# Experimental instability feature columns (kept strictly isolated from canonical 26 features)
 EXPERIMENTAL_INSTABILITY_FEATURE_NAMES = [
     # 1. Extended Revisions (12h) and Revision Magnitudes
     "forecast_delta_12h",

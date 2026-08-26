@@ -1,5 +1,5 @@
 """
-Stage A Scientific Data Expansion Runner (Day 7).
+Stage A Scientific Data Expansion Runner.
 
 Executes genuine historical collection and feature processing across:
 - 4 Pilot Indian Locations: Delhi, Mumbai, Kolkata, Bengaluru

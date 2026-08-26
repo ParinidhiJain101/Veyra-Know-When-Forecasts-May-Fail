@@ -1,5 +1,5 @@
 """
-Model Evaluation and Diagnostic Analysis Framework (Day 4).
+Model Evaluation and Diagnostic Analysis Framework.
 
 Computes PR-AUC, Brier Score, ROC-AUC, confusion matrix, threshold curves,
 stratified lead-time bins, and per-variable breakdowns in pure NumPy.

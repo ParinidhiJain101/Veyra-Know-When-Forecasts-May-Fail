@@ -1,5 +1,5 @@
 """
-Probability Calibration for Forecast-Bust Sentinel (Day 4).
+Probability Calibration for Forecast-Bust Sentinel.
 
 Provides Platt Scaling (Sigmoid) and Isotonic Regression calibrators,
 fit strictly on out-of-fold validation probabilities in pure NumPy.

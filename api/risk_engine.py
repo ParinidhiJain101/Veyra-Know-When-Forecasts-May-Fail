@@ -1,11 +1,11 @@
 """
-Operational Forecast-Risk Engine (Day 6).
+Operational Forecast-Risk Engine.
 
 Coordinates location colocation, issue-time feature extraction, calibrated model
 inference via ForecastBustModelService, dynamic verification status derivation,
 and structured explanation generation.
 
-SCIENTIFIC CONSTRAINTS:
+Scientific Constraints:
 - Single feature pipeline path: uses features/feature_pipeline.py directly.
 - Verification status strictly requires an actual verified truth pair to claim HISTORICALLY_VERIFIED.
 - Grid resolution provenance is never silently guessed (returns UNKNOWN if resolution is absent).

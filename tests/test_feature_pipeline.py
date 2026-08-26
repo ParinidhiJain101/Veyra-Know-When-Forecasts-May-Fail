@@ -1,5 +1,5 @@
 """
-Unit tests for Issue-Time-Safe Feature Pipeline (Phase 3).
+Unit tests for Issue-Time-Safe Feature Pipeline.
 
 Tests:
 1. Extraction of canonical 26 features

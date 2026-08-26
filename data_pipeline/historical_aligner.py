@@ -1,5 +1,5 @@
 """
-Historical Alignment & Forecast Error Engine (Phase 2).
+Historical Alignment & Forecast Error Engine.
 
 Aligns standardized GEFS forecast predictions with ECMWF ERA5 reanalysis ground truth
 by location, variable, and valid_time under an explicit spatial colocation policy.
@@ -11,9 +11,9 @@ Calculates:
 - Ensemble mean absolute error: ens_mean_abs_error = |ensemble_mean - truth_value|
 - Spatial colocation distance (km)
 
-SCIENTIFIC SAFEGUARD:
+Scientific Safeguard:
 Truth observations and error metrics are strictly for verification, historical training,
-and evaluation. They are NEVER live forecast features.
+and evaluation. They are never live forecast features.
 """
 
 import math

@@ -1,9 +1,8 @@
 """
-Regional Risk Aggregator (Day 6).
+Regional Risk Aggregator.
 
 Provides transparent spatial and regional summaries across multiple location forecasts.
-CRITICAL CONSTRAINT: Outputs are explicitly spatial metrics (max risk, alert fraction, etc.),
-NOT state-level calibrated probabilities.
+Outputs are explicitly spatial metrics (max risk, alert fraction), not state-level calibrated probabilities.
 """
 
 from collections import Counter

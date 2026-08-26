@@ -1,5 +1,5 @@
 """
-Unit and Integration Tests for Day 4 ML Modeling Framework.
+Unit and Integration Tests for ML Modeling Framework.
 
 Tests:
 1. Feature selection & canonical 26 features integrity

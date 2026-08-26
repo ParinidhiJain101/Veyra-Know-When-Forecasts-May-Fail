@@ -1,5 +1,5 @@
 """
-API Router and Service Handlers (Day 6).
+API Router and Service Handlers.
 
 Provides typed dispatching functions for health checks, location listings,
 forecast risk inference, and regional risk aggregations.

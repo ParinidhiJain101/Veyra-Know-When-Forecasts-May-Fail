@@ -1,7 +1,7 @@
 """
-Day 4 Master Execution Script — ML Model Development & Evaluation.
+ML Model Development & Evaluation Protocol Runner.
 
-Executes the complete Day 4 modeling protocol according to SIH26079 Roadmap:
+Executes the model training and evaluation protocol:
 1. Load frozen verified training dataset (663 rows x 26 features)
 2. Issue-time group chronological split (Train: Aug 15-19, Val: Aug 20, Test: Aug 21)
 3. Fit & evaluate baselines:

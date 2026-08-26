@@ -1,5 +1,5 @@
 """
-Phase 3 Execution Script — Bust Labels, Features, and Leakage Audit.
+Bust Labels, Features, and Leakage Audit Pipeline Runner.
 
 Executes end-to-end:
 1. Load Paired Historical Dataset (Day 2 output)

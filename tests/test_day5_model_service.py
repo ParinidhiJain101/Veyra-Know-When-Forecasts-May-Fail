@@ -1,5 +1,5 @@
 """
-Comprehensive Unit and Integration Tests for Day 5 Model Service (ForecastBustModelService).
+Comprehensive Unit and Integration Tests for Model Service (ForecastBustModelService).
 
 Tests:
 1. Model service loads artifacts cleanly

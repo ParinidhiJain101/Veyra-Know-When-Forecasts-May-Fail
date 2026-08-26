@@ -1,5 +1,5 @@
 """
-Day 6 Integration & Operational Risk Pipeline Test Suite.
+Operational Risk Pipeline and API Integration Test Suite.
 
 Verifies end-to-end functionality of:
 - LocationRegistry and spatial colocation without hardcoded fabrication

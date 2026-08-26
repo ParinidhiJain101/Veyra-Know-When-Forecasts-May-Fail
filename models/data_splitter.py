@@ -1,5 +1,5 @@
 """
-Chronological and Group-Preserving Data Splitter (Phase 2 / Day 4).
+Chronological and Group-Preserving Data Splitter.
 
 Ensures strict temporal ordering with zero issue_time group leakage across
 train, validation, and test splits.

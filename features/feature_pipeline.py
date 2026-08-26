@@ -1,13 +1,13 @@
 """
-Issue-Time-Safe Feature Pipeline (Phase 3).
+Issue-Time-Safe Feature Pipeline.
 
 Generates tabular features for Medium-Range Weather Forecast Bust Risk Estimation.
 
-SCIENTIFIC CONSTRAINTS & LEAKAGE SAFEGUARDS:
-- ALL features must be computable strictly at forecast issue_time.
+Scientific Constraints & Leakage Safeguards:
+- All features must be computable strictly at forecast issue_time.
 - Features are derived exclusively from the forecast trajectory, ensemble distribution statistics,
   physical gradients, inter-cycle forecast revisions, and issue-time calendar/astronomical timestamps.
-- Ground truth / ERA5 observations / future verification errors are STRICTLY FORBIDDEN as features.
+- Ground truth / ERA5 observations / future verification errors are strictly forbidden as features.
 - Inter-cycle revisions (6h, 24h) compare predictions for the SAME valid_time across preceding cycles.
   If the prior cycle does not exist, NaN is strictly preserved (never imputed with 0).
 """

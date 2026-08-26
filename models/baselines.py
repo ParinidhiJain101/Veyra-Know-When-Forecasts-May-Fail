@@ -1,11 +1,11 @@
 """
-Baseline Models for Forecast-Bust Sentinel (Day 4 / SIH26079 Roadmap).
+Baseline Models for Forecast-Bust Sentinel.
 
 Provides:
-- MajorityClassBaseline (E0 variant: always predicts non-bust, P=0)
-- ClimatologyBaseline (E0: predicts training-set empirical bust rate)
-- PersistenceBaseline (E1: persists recent 24h forecast revision magnitude mapped to risk)
-- SpreadHeuristicBaseline (E2: logistic sigmoid fit on ensemble_std from training set)
+- MajorityClassBaseline (always predicts non-bust, P=0)
+- ClimatologyBaseline (predicts training-set empirical bust rate)
+- PersistenceBaseline (persists recent 24h forecast revision magnitude mapped to risk)
+- SpreadHeuristicBaseline (logistic sigmoid fit on ensemble_std from training set)
 """
 
 from typing import Optional, Union
