@@ -85,11 +85,16 @@ data/historical/*
 !data/historical/.gitkeep
 data/training/*
 !data/training/.gitkeep
+models/*
+!models/.gitkeep
 *.nc
 *.grib
 *.grib2
 *.parquet
 *.h5
 *.hdf5
+*.joblib
+*.pkl
+
 
 
