@@ -110,7 +110,16 @@ def run_phase3_pipeline(
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Combine metadata, features, and target labels without duplicate columns
+    # Source ensemble distribution audit columns to preserve for reproducibility and downstream re-extraction
+    source_audit_cols = [
+        "ensemble_min",
+        "ensemble_max",
+        "q10",
+        "q90",
+    ]
+    avail_audit = [c for c in source_audit_cols if c in df_labeled.columns]
+
+    # Combine metadata, source audit columns, derived feature matrix X, and target labels without duplicate columns
     target_cols = [
         "bust_label",
         "bust_threshold",
@@ -126,7 +135,7 @@ def run_phase3_pipeline(
     avail_targets = [c for c in target_cols if c in df_labeled.columns]
     unique_meta_cols = [c for c in metadata.columns if c not in X.columns]
 
-    final_df = pd.concat([metadata[unique_meta_cols], X, df_labeled[avail_targets]], axis=1)
+    final_df = pd.concat([metadata[unique_meta_cols], df_labeled[avail_audit], X, df_labeled[avail_targets]], axis=1)
 
     parquet_out = out_dir / "training_dataset.parquet"
     csv_out = out_dir / "training_dataset.csv"

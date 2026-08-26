@@ -1,0 +1,49 @@
+{
+  "model_name": "Forecast-Bust Sentinel LightGBM Calibrated",
+  "created_at_utc": "2026-08-26T12:51:26.309239+00:00",
+  "input_dataset": "data/features/training_dataset.parquet",
+  "feature_count": 26,
+  "features": [
+    "ensemble_std",
+    "ensemble_range",
+    "ensemble_iqr",
+    "ensemble_skew_proxy",
+    "ensemble_cv",
+    "ensemble_spread_to_iqr_ratio",
+    "member_count",
+    "has_full_ensemble",
+    "forecast_value",
+    "ensemble_mean",
+    "ensemble_spread_delta_6h",
+    "ensemble_spread_delta_24h",
+    "forecast_delta_6h",
+    "forecast_delta_24h",
+    "lead_hours",
+    "lead_days",
+    "valid_hour",
+    "valid_month",
+    "valid_dayofweek",
+    "sin_hour",
+    "cos_hour",
+    "sin_month",
+    "cos_month",
+    "is_weekend",
+    "latitude",
+    "longitude"
+  ],
+  "selected_threshold": 0.28,
+  "calibrator_method": "sigmoid_platt",
+  "training_cycles": [
+    "2026-08-15 00:00:00+00:00",
+    "2026-08-16 00:00:00+00:00",
+    "2026-08-17 00:00:00+00:00",
+    "2026-08-18 00:00:00+00:00",
+    "2026-08-19 00:00:00+00:00"
+  ],
+  "validation_cycles": [
+    "2026-08-20 00:00:00+00:00"
+  ],
+  "test_cycles": [
+    "2026-08-21 00:00:00+00:00"
+  ]
+}

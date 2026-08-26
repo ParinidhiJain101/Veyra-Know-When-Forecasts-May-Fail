@@ -48,3 +48,7 @@ data/cache/*
 .vscode/
 .idea/
 *.swp
+
+# Local investigation / tooling
+scratch/
+

@@ -6,8 +6,10 @@ Generates tabular features for Medium-Range Weather Forecast Bust Risk Estimatio
 SCIENTIFIC CONSTRAINTS & LEAKAGE SAFEGUARDS:
 - ALL features must be computable strictly at forecast issue_time.
 - Features are derived exclusively from the forecast trajectory, ensemble distribution statistics,
-  physical gradients, and issue-time calendar/astronomical timestamps.
+  physical gradients, inter-cycle forecast revisions, and issue-time calendar/astronomical timestamps.
 - Ground truth / ERA5 observations / future verification errors are STRICTLY FORBIDDEN as features.
+- Inter-cycle revisions (6h, 24h) compare predictions for the SAME valid_time across preceding cycles.
+  If the prior cycle does not exist, NaN is strictly preserved (never imputed with 0).
 """
 
 import math
@@ -27,7 +29,7 @@ FEATURE_COLUMN_NAMES = [
     "ensemble_spread_to_iqr_ratio",
     "member_count",
     "has_full_ensemble",
-    # 2. Forecast Values & Trajectory Gradients
+    # 2. Forecast Values & Inter-Cycle Revisions
     "forecast_value",
     "ensemble_mean",
     "ensemble_spread_delta_6h",
@@ -91,7 +93,7 @@ class IssueTimeSafeFeaturePipeline:
         df["valid_time"] = pd.to_datetime(df["valid_time"], utc=True)
         df["issue_time"] = pd.to_datetime(df["issue_time"], utc=True)
 
-        # Sort chronologically by location, variable, and valid_time for trajectory gradient features
+        # Sort chronologically by location, variable, issue_time, valid_time
         sort_keys = ["location", "variable", "issue_time", "valid_time"]
         avail_sort = [k for k in sort_keys if k in df.columns]
         df = df.sort_values(by=avail_sort).reset_index(drop=True)
@@ -99,12 +101,12 @@ class IssueTimeSafeFeaturePipeline:
         # ---------------------------------------------------------
         # 1. Ensemble Dispersion & Spread Features
         # ---------------------------------------------------------
-        ens_std = df["ensemble_std"].fillna(0.0).astype(float)
-        ens_mean = df["ensemble_mean"].fillna(df["forecast_value"]).astype(float)
-        ens_min = df["ensemble_min"].fillna(ens_mean).astype(float)
-        ens_max = df["ensemble_max"].fillna(ens_mean).astype(float)
-        q10 = df["q10"].fillna(ens_min).astype(float)
-        q90 = df["q90"].fillna(ens_max).astype(float)
+        ens_std = df["ensemble_std"].fillna(0.0).astype(float) if "ensemble_std" in df.columns else pd.Series(0.0, index=df.index)
+        ens_mean = df["ensemble_mean"].fillna(df["forecast_value"]).astype(float) if "ensemble_mean" in df.columns else df["forecast_value"].astype(float)
+        ens_min = df["ensemble_min"].fillna(ens_mean).astype(float) if "ensemble_min" in df.columns else ens_mean
+        ens_max = df["ensemble_max"].fillna(ens_mean).astype(float) if "ensemble_max" in df.columns else ens_mean
+        q10 = df["q10"].fillna(ens_min).astype(float) if "q10" in df.columns else ens_min
+        q90 = df["q90"].fillna(ens_max).astype(float) if "q90" in df.columns else ens_max
 
         df["ensemble_range"] = (ens_max - ens_min).clip(lower=0.0)
         df["ensemble_iqr"] = (q90 - q10).clip(lower=0.0)
@@ -124,15 +126,49 @@ class IssueTimeSafeFeaturePipeline:
         df["has_full_ensemble"] = (df["member_count"] == 31).astype(int)
 
         # ---------------------------------------------------------
-        # 2. Trajectory Rate of Change / Gradients (along forecast valid time)
+        # 2. Inter-Cycle Forecast & Spread Revisions (for identical valid_time)
         # ---------------------------------------------------------
-        # Compute forward forecast gradients along lead time
-        group_cols = [c for c in ["location", "variable", "issue_time"] if c in df.columns]
+        # Compare prediction for the SAME valid_time against the preceding cycle (~6h or ~24h earlier).
+        # For each current row (issue_time=T), find the forecast from the cycle issued at T-6h or T-24h
+        # that predicted the same valid_time. If no such prior cycle exists, NaN is preserved.
+        lookup_cols = ["location", "variable", "valid_time", "issue_time", "forecast_value", "ensemble_std"]
+        lookup_cols = [c for c in lookup_cols if c in df.columns]
+        lookup = df[lookup_cols].drop_duplicates().copy()
 
-        df["forecast_delta_6h"] = df.groupby(group_cols)["forecast_value"].diff(periods=6).fillna(0.0)
-        df["forecast_delta_24h"] = df.groupby(group_cols)["forecast_value"].diff(periods=24).fillna(0.0)
-        df["ensemble_spread_delta_6h"] = df.groupby(group_cols)["ensemble_std"].diff(periods=6).fillna(0.0)
-        df["ensemble_spread_delta_24h"] = df.groupby(group_cols)["ensemble_std"].diff(periods=24).fillna(0.0)
+        # 6-hour prior cycle lookup: find forecast from cycle issued 6h before current
+        df["_prior_issue_6h"] = df["issue_time"] - pd.Timedelta(hours=6)
+        m6 = pd.merge(
+            df,
+            lookup.rename(columns={"forecast_value": "forecast_value_prev_6h",
+                                   "ensemble_std": "ensemble_std_prev_6h",
+                                   "issue_time": "issue_time_prev"}),
+            left_on=["location", "variable", "valid_time", "_prior_issue_6h"],
+            right_on=["location", "variable", "valid_time", "issue_time_prev"],
+            how="left",
+        )
+
+        # 24-hour prior cycle lookup: find forecast from cycle issued 24h before current
+        df["_prior_issue_24h"] = df["issue_time"] - pd.Timedelta(hours=24)
+        m24 = pd.merge(
+            df,
+            lookup.rename(columns={"forecast_value": "forecast_value_prev_24h",
+                                   "ensemble_std": "ensemble_std_prev_24h",
+                                   "issue_time": "issue_time_prev"}),
+            left_on=["location", "variable", "valid_time", "_prior_issue_24h"],
+            right_on=["location", "variable", "valid_time", "issue_time_prev"],
+            how="left",
+        )
+
+        # Revisions: current forecast minus prior cycle forecast for the SAME valid_time
+        # If previous cycle does not exist, leaves NaN (never fills with 0)
+        df["forecast_delta_6h"] = m6["forecast_value"] - m6["forecast_value_prev_6h"]
+        df["ensemble_spread_delta_6h"] = m6["ensemble_std"] - m6["ensemble_std_prev_6h"]
+
+        df["forecast_delta_24h"] = m24["forecast_value"] - m24["forecast_value_prev_24h"]
+        df["ensemble_spread_delta_24h"] = m24["ensemble_std"] - m24["ensemble_std_prev_24h"]
+
+        # Clean up temporary columns
+        df.drop(columns=["_prior_issue_6h", "_prior_issue_24h"], inplace=True)
 
         # ---------------------------------------------------------
         # 3. Horizon & Temporal/Cyclical Features
@@ -164,8 +200,8 @@ class IssueTimeSafeFeaturePipeline:
         # Build feature DataFrame and metadata DataFrame
         X = df[FEATURE_COLUMN_NAMES].copy()
         
-        # Replace any inf / -inf with nan and fill
-        X = X.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        # Replace any inf / -inf with nan
+        X = X.replace([np.inf, -np.inf], np.nan)
 
         meta_cols_present = [c for c in METADATA_COLUMNS if c in df.columns]
         metadata = df[meta_cols_present].copy()

@@ -5,3 +5,9 @@ numpy>=1.24.0
 pyarrow>=14.0.0
 pyyaml>=6.0.0
 pytest>=7.0.0
+
+# Day 4: Machine Learning Modeling dependencies
+scikit-learn>=1.4.0
+lightgbm>=4.0.0
+scipy>=1.10.0
+joblib>=1.3.0

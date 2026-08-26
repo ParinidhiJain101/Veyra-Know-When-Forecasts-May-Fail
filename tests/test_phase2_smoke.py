@@ -19,14 +19,14 @@ from data_pipeline.historical_aligner import HistoricalAlignmentEngine, standard
 
 
 @pytest.mark.smoke
-def test_real_historical_alignment_smoke():
+def test_real_historical_alignment_smoke(tmp_path):
     """End-to-end smoke test for historical forecast/reference alignment using real data."""
     start_date = "2026-08-20"
     end_date = "2026-08-24"
     location = "delhi"
 
     # 1. Ingest/Load Historical GEFS Forecast with authoritative registry verification
-    gefs_collector = GEFSCollector(raw_dir="data/raw/gefs")
+    gefs_collector = GEFSCollector(raw_dir=str(tmp_path / "raw_gefs"))
     raw_gefs, raw_gefs_p, gefs_manifest_p, gefs_manifest = gefs_collector.fetch_forecast(
         latitude=28.6139,
         longitude=77.2090,
@@ -42,20 +42,20 @@ def test_real_historical_alignment_smoke():
     assert gefs_manifest["authoritative_cycle_details"]["selected_cycle"] == "18z"
 
     # 2. Ingest/Load Historical ERA5 Truth Reference
-    era5_collector = ERA5ReferenceCollector(raw_dir="data/raw/era5")
+    era5_collector = ERA5ReferenceCollector(raw_dir=str(tmp_path / "raw_era5"))
     raw_era5, raw_era5_p, era5_manifest_p, era5_manifest = era5_collector.fetch_historical_reference(
         start_date=start_date,
         end_date=end_date,
         latitude=28.6139,
         longitude=77.2090,
         location_name=location,
-        use_cache=True,
+        use_cache=False,
     )
     assert raw_era5_p.exists()
     assert era5_manifest_p.exists()
 
     # 3. Standardize Both
-    standardizer = GEFSStandardizer(processed_dir="data/processed/gefs")
+    standardizer = GEFSStandardizer(processed_dir=str(tmp_path / "processed_gefs"))
     df_forecast = standardizer.standardize(
         raw_gefs,
         issue_time=gefs_manifest["explicit_issue_time_utc"],
@@ -68,7 +68,7 @@ def test_real_historical_alignment_smoke():
     assert len(df_truth) > 0
 
     # 4. Align & Compute Error
-    aligner = HistoricalAlignmentEngine(historical_dir="data/historical")
+    aligner = HistoricalAlignmentEngine(historical_dir=str(tmp_path / "historical"))
     df_paired, report = aligner.align(df_forecast, df_truth, join_policy="inner")
 
     # Invariants
