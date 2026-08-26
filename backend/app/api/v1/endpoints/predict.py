@@ -1,12 +1,21 @@
-"""Forecast bust prediction endpoint."""
+"""Forecast bust prediction endpoint with live model serving."""
 from fastapi import APIRouter, Depends
 from backend.app.agents.forecast_bust_agent import ForecastBustAgent
+from backend.app.safety.abstention import SafetyEvaluator
 from backend.app.schemas.prediction import PredictionRequest, PredictionResponse
+from backend.app.services.feature_service import LiveFeatureService
+from backend.app.services.model_service import LiveLogisticModelService
+from backend.app.services.openmeteo_service import OpenMeteoGEFSWeatherService
 
 router = APIRouter()
 
-# Default singleton instance for the agent
-_default_agent = ForecastBustAgent()
+# Default live production agent with real weather, feature, and model services
+_default_agent = ForecastBustAgent(
+    weather_service=OpenMeteoGEFSWeatherService(),
+    feature_service=LiveFeatureService(),
+    model_service=LiveLogisticModelService(),
+    safety_evaluator=SafetyEvaluator(),
+)
 
 
 def get_forecast_bust_agent() -> ForecastBustAgent:
@@ -17,10 +26,10 @@ def get_forecast_bust_agent() -> ForecastBustAgent:
 @router.post(
     "/predict",
     response_model=PredictionResponse,
-    summary="Predict Forecast Bust",
+    summary="Predict Forecast Bust Risk",
     description=(
-        "Evaluates the probability and risk of an issued weather forecast failing unusually badly. "
-        "Returns a safe ABSTAIN state with trust_state=UNAVAILABLE while the ML model is not ready."
+        "Evaluates the probability and risk of an issued weather forecast failing unusually badly "
+        "using real-time GEFS weather ingestion, leakage-safe feature engineering, and the trained baseline ML model."
     ),
 )
 async def predict_forecast_bust(

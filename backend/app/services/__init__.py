@@ -9,8 +9,14 @@ from backend.app.services.base import (
     WeatherDataResult,
     WeatherResult,
 )
-from backend.app.services.feature_service import UnavailableFeatureService
-from backend.app.services.model_service import UnavailableModelService
+from backend.app.services.feature_service import (
+    LiveFeatureService,
+    UnavailableFeatureService,
+)
+from backend.app.services.model_service import (
+    LiveLogisticModelService,
+    UnavailableModelService,
+)
 from backend.app.services.openmeteo_service import OpenMeteoGEFSWeatherService
 from backend.app.services.reference_service import (
     BaseReferenceWeatherService,
@@ -30,7 +36,10 @@ __all__ = [
     "UnavailableWeatherService",
     "OpenMeteoGEFSWeatherService",
     "UnavailableFeatureService",
+    "LiveFeatureService",
     "UnavailableModelService",
+    "LiveLogisticModelService",
     "BaseReferenceWeatherService",
     "OpenMeteoArchiveReferenceService",
 ]
+

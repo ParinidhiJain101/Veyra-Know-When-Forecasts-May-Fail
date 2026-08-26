@@ -13,6 +13,7 @@ from backend.app.services.base import (
     ModelResult,
     WeatherResult,
 )
+from backend.app.services.model_service import UnavailableModelService
 
 
 def test_predict_valid_location_accepted(client: TestClient):
@@ -25,48 +26,73 @@ def test_predict_valid_location_accepted(client: TestClient):
 
 def test_predict_bust_probability_is_null_when_model_unavailable(client: TestClient):
     """Test that bust_probability is strictly null (None) while model is unavailable."""
-    response = client.post("/v1/predict", json={"location": "Tokyo"})
-    assert response.status_code == 200
-    data = response.json()
-    assert data["bust_probability"] is None
-    assert data["risk_level"] is None
+    unavailable_agent = ForecastBustAgent(model_service=UnavailableModelService())
+    app.dependency_overrides[get_forecast_bust_agent] = lambda: unavailable_agent
+    try:
+        response = client.post("/v1/predict", json={"location": "Tokyo"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["bust_probability"] is None
+        assert data["risk_level"] is None
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_predict_abstain_is_true_when_model_unavailable(client: TestClient):
     """Test that abstain flag is True while model is unavailable."""
-    response = client.post("/v1/predict", json={"location": "Paris"})
-    assert response.status_code == 200
-    data = response.json()
-    assert data["abstain"] is True
+    unavailable_agent = ForecastBustAgent(model_service=UnavailableModelService())
+    app.dependency_overrides[get_forecast_bust_agent] = lambda: unavailable_agent
+    try:
+        response = client.post("/v1/predict", json={"location": "Paris"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["abstain"] is True
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_predict_trust_state_is_unavailable(client: TestClient):
     """Test that trust_state is UNAVAILABLE while model is unavailable."""
-    response = client.post("/v1/predict", json={"location": "Berlin"})
-    assert response.status_code == 200
-    data = response.json()
-    assert data["trust_state"] == "UNAVAILABLE"
+    unavailable_agent = ForecastBustAgent(model_service=UnavailableModelService())
+    app.dependency_overrides[get_forecast_bust_agent] = lambda: unavailable_agent
+    try:
+        response = client.post("/v1/predict", json={"location": "Berlin"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["trust_state"] == "UNAVAILABLE"
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_predict_model_not_ready_in_reason_codes(client: TestClient):
-    """Test that MODEL_NOT_READY is present in reason_codes list."""
-    response = client.post("/v1/predict", json={"location": "New York"})
-    assert response.status_code == 200
-    data = response.json()
-    assert "MODEL_NOT_READY" in data["reason_codes"]
+    """Test that MODEL_NOT_READY is present in reason_codes list when model is unavailable."""
+    unavailable_agent = ForecastBustAgent(model_service=UnavailableModelService())
+    app.dependency_overrides[get_forecast_bust_agent] = lambda: unavailable_agent
+    try:
+        response = client.post("/v1/predict", json={"location": "New York"})
+        assert response.status_code == 200
+        data = response.json()
+        assert "MODEL_NOT_READY" in data["reason_codes"]
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_predict_with_optional_target_date(client: TestClient):
-    """Test prediction request with an optional target_date provided."""
-    response = client.post(
-        "/v1/predict",
-        json={"location": "Sydney", "target_date": "2026-09-01"},
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["location"] == "Sydney"
-    assert data["abstain"] is True
-    assert data["bust_probability"] is None
+    """Test prediction request with an optional target_date provided when model is unavailable."""
+    unavailable_agent = ForecastBustAgent(model_service=UnavailableModelService())
+    app.dependency_overrides[get_forecast_bust_agent] = lambda: unavailable_agent
+    try:
+        response = client.post(
+            "/v1/predict",
+            json={"location": "Sydney", "target_date": "2026-09-01"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["location"] == "Sydney"
+        assert data["abstain"] is True
+        assert data["bust_probability"] is None
+    finally:
+        app.dependency_overrides.clear()
 
 
 @pytest.mark.parametrize(
