@@ -26,7 +26,10 @@ KNOWN_LOCATIONS: dict[str, tuple[float, float]] = {
     "paris": (48.8566, 2.3522),
     "singapore": (1.3521, 103.8198),
     "sydney": (-33.8688, 151.2093),
+    "dubai": (25.2048, 55.2708),
+    "geneva": (46.2044, 6.1432),
 }
+
 
 
 DEFAULT_ENSEMBLE_API_URL = "https://ensemble-api.open-meteo.com/v1/ensemble"
