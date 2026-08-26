@@ -11,7 +11,7 @@ actual_grid_coordinates and spatial_distance_km remain unresolved (None).
 import math
 from typing import Any, Dict, List, Optional, Tuple
 
-from backend.app.builder2.schemas import LocationCoordinates, LocationInfo
+from builder2.schemas import LocationCoordinates, LocationInfo
 
 
 def haversine_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

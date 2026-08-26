@@ -8,11 +8,11 @@ from typing import Any, Dict, Optional
 import numpy as np
 import pandas as pd
 
-from backend.app.builder2.feature_pipeline import (
+from builder2.feature_pipeline import (
     FEATURE_COLUMN_NAMES,
     IssueTimeSafeFeaturePipeline,
 )
-from backend.app.builder2.instability_fingerprint import ForecastInstabilityFingerprintEngine
+from builder2.instability_fingerprint import ForecastInstabilityFingerprintEngine
 from backend.app.builder2.weather_adapter import weather_result_to_dataframe
 from backend.app.schemas.prediction import ReasonCode
 from backend.app.services.base import BaseFeatureService, FeatureResult, WeatherResult

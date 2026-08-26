@@ -26,13 +26,13 @@ import pytest
 
 from backend.app.agents.forecast_bust_agent import ForecastBustAgent
 from backend.app.builder2.feature_adapter import Builder2FeatureAdapter
-from backend.app.builder2.feature_pipeline import (
+from builder2.feature_pipeline import (
     FEATURE_COLUMN_NAMES,
     METADATA_COLUMNS,
     IssueTimeSafeFeaturePipeline,
 )
 from backend.app.builder2.model_adapter import Builder2ModelAdapter
-from backend.app.builder2.model_service import ForecastBustModelService
+from builder2.model_service import ForecastBustModelService
 from backend.app.builder2.weather_adapter import weather_result_to_dataframe
 from backend.app.safety.abstention import SafetyEvaluator
 from backend.app.schemas.prediction import PredictionRequest, ReasonCode, RiskLevel, TrustState

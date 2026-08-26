@@ -10,9 +10,9 @@ from typing import Any, Dict, List, Optional, Union
 import numpy as np
 import pandas as pd
 
-from backend.app.builder2.explainer import ForecastBustExplainer
-from backend.app.builder2.feature_pipeline import FEATURE_COLUMN_NAMES
-from backend.app.builder2.model_service import ForecastBustModelService
+from builder2.explainer import ForecastBustExplainer
+from builder2.feature_pipeline import FEATURE_COLUMN_NAMES
+from builder2.model_service import ForecastBustModelService
 from backend.app.schemas.prediction import ReasonCode
 from backend.app.services.base import BaseModelService, FeatureResult, ModelResult
 

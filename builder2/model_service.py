@@ -16,9 +16,9 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from backend.app.builder2.feature_pipeline import FEATURE_COLUMN_NAMES
-import backend.app.builder2.tree_classifier as _tree_classifier
-import backend.app.builder2.calibrator as _calibrator
+from builder2.feature_pipeline import FEATURE_COLUMN_NAMES
+import builder2.tree_classifier as _tree_classifier
+import builder2.calibrator as _calibrator
 
 # Compatibility alias for unpickling artifacts saved under 'models.*' module namespace
 sys.modules.setdefault("models.tree_classifier", _tree_classifier)

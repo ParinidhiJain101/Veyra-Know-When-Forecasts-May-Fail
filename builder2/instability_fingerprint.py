@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 
-from backend.app.builder2.label_engine import assign_lead_bin
+from builder2.label_engine import assign_lead_bin
 
 # Variable-specific tolerance defaults for trajectory classification
 DEFAULT_VARIABLE_TOLERANCES = {

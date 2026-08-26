@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
-from backend.app.builder2.schemas import ContributingFactor, ExplanationItem
+from builder2.schemas import ContributingFactor, ExplanationItem
 
 
 class ForecastBustExplainer:
