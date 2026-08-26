@@ -46,7 +46,9 @@ class SafetyEvaluator(BaseSafetyService):
         # 1. Weather Data Stage Check
         if weather_result is not None:
             if not weather_result.is_available or weather_result.error:
-                if weather_result.quality_flags and weather_result.quality_flags.get("qc_passed") is False:
+                if weather_result.quality_flags and weather_result.quality_flags.get("invalid_location"):
+                    reason = ReasonCode.INVALID_LOCATION.value
+                elif weather_result.quality_flags and weather_result.quality_flags.get("qc_passed") is False:
                     reason = ReasonCode.QC_FAILED.value
                 elif weather_result.metadata and "status" in weather_result.metadata:
                     reason = weather_result.metadata["status"]
@@ -61,6 +63,7 @@ class SafetyEvaluator(BaseSafetyService):
                     reason_codes=[reason],
                     metadata={"error": weather_result.error} if weather_result.error else {},
                 )
+
 
         # 2. Feature Pipeline Stage Check
         if feature_result is not None:
