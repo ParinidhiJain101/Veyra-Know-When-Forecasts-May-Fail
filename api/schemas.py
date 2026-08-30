@@ -37,7 +37,7 @@ class LocationCoordinates:
 
 @dataclass
 class LocationInfo:
-    """Location metadata with explicit spatial offset to forecast grid point."""
+    """Location metadata with explicit spatial offset to forecast grid point and climate regime."""
     location_id: str
     country: str
     state_region: str
@@ -45,9 +45,14 @@ class LocationInfo:
     requested_coordinates: LocationCoordinates
     actual_grid_coordinates: Optional[LocationCoordinates] = None
     spatial_distance_km: Optional[float] = None
+    climate_zone: Optional[str] = None
+    meteorological_regime: Optional[str] = None
+    elevation_m: Optional[float] = None
+    is_benchmark: bool = False
+    rationale: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        data: Dict[str, Any] = {
             "location_id": self.location_id,
             "country": self.country,
             "state_region": self.state_region,
@@ -56,6 +61,16 @@ class LocationInfo:
             "actual_grid_coordinates": self.actual_grid_coordinates.to_dict() if self.actual_grid_coordinates else None,
             "spatial_distance_km": round(self.spatial_distance_km, 2) if self.spatial_distance_km is not None else None,
         }
+        if self.climate_zone is not None:
+            data["climate_zone"] = self.climate_zone
+        if self.meteorological_regime is not None:
+            data["meteorological_regime"] = self.meteorological_regime
+        if self.elevation_m is not None:
+            data["elevation_m"] = self.elevation_m
+        data["is_benchmark"] = self.is_benchmark
+        if self.rationale is not None:
+            data["rationale"] = self.rationale
+        return data
 
 
 @dataclass

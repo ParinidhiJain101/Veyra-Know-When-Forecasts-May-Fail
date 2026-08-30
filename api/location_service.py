@@ -39,7 +39,7 @@ def haversine_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) ->
 class LocationRegistry:
     """Registry of known monitoring points and spatial metadata."""
 
-    # Default registered locations (Delhi retains verified pilot grid point; others require source-resolution)
+    # Default registered locations (20 Indian candidate stations; 8 core Phase 2 benchmark stations)
     DEFAULT_LOCATIONS: Dict[str, Dict[str, Any]] = {
         # North
         "delhi": {
@@ -51,6 +51,11 @@ class LocationRegistry:
             "requested_longitude": 77.2090,
             "verified_grid_latitude": 28.50,
             "verified_grid_longitude": 77.25,
+            "climate_zone": "Cwa/BSh",
+            "meteorological_regime": "Subtropical Semi-Arid / Continental",
+            "elevation_m": 214.0,
+            "is_benchmark": True,
+            "rationale": "Extreme seasonal temperature swings, winter radiation fog, pre-monsoon heatwaves, continental landlocked setting.",
         },
         "srinagar": {
             "location_id": "srinagar",
@@ -61,6 +66,11 @@ class LocationRegistry:
             "requested_longitude": 74.7973,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "Cfb/Dfb",
+            "meteorological_regime": "Himalayan Mountain & Valley",
+            "elevation_m": 1585.0,
+            "is_benchmark": True,
+            "rationale": "Complex orographic forcing, alpine cold, winter western disturbances, strong valley temperature inversions.",
         },
         "chandigarh": {
             "location_id": "chandigarh",
@@ -71,6 +81,11 @@ class LocationRegistry:
             "requested_longitude": 76.7794,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "Cwa",
+            "meteorological_regime": "Sub-Himalayan Plains",
+            "elevation_m": 321.0,
+            "is_benchmark": False,
+            "rationale": "Foothill transition zone between Gangetic plains and Siwalik ranges.",
         },
         "jaipur": {
             "location_id": "jaipur",
@@ -81,6 +96,11 @@ class LocationRegistry:
             "requested_longitude": 75.7873,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "BSh/BWh",
+            "meteorological_regime": "Hot Semi-Arid / Desert Margin",
+            "elevation_m": 431.0,
+            "is_benchmark": True,
+            "rationale": "High convective instability, dry boundary layer, dust/aerosol radiative forcing, Thar Desert proximity.",
         },
         "lucknow": {
             "location_id": "lucknow",
@@ -91,6 +111,11 @@ class LocationRegistry:
             "requested_longitude": 80.9462,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "Cwa",
+            "meteorological_regime": "Central Gangetic Plains",
+            "elevation_m": 123.0,
+            "is_benchmark": False,
+            "rationale": "Deep alluvial plain, intense monsoon trough passage, dense winter advection fog.",
         },
         # West
         "mumbai": {
@@ -102,6 +127,11 @@ class LocationRegistry:
             "requested_longitude": 72.8777,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "Am/Aw",
+            "meteorological_regime": "Tropical Coastal / Maritime",
+            "elevation_m": 14.0,
+            "is_benchmark": True,
+            "rationale": "Strong marine boundary layer, coastal monsoon precipitation bursts, high humidity, maritime thermal moderation.",
         },
         "pune": {
             "location_id": "pune",
@@ -112,6 +142,11 @@ class LocationRegistry:
             "requested_longitude": 73.8567,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "BSh/Aw",
+            "meteorological_regime": "Western Ghats Rain-Shadow",
+            "elevation_m": 560.0,
+            "is_benchmark": False,
+            "rationale": "Lee-side orographic drying, plateau climate, sharp rainfall gradient east of Ghats.",
         },
         "ahmedabad": {
             "location_id": "ahmedabad",
@@ -122,6 +157,11 @@ class LocationRegistry:
             "requested_longitude": 72.5714,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "BSh",
+            "meteorological_regime": "Semi-Arid Western Plains",
+            "elevation_m": 53.0,
+            "is_benchmark": False,
+            "rationale": "Hot semi-arid transitional zone with high summer thermal peaks.",
         },
         "goa": {
             "location_id": "goa",
@@ -132,6 +172,11 @@ class LocationRegistry:
             "requested_longitude": 73.8278,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "Am",
+            "meteorological_regime": "Konkan Coastal Monsoon",
+            "elevation_m": 10.0,
+            "is_benchmark": False,
+            "rationale": "Direct Arabian Sea monsoon intercept with heavy orographic coastal rainfall.",
         },
         # Central
         "bhopal": {
@@ -143,6 +188,11 @@ class LocationRegistry:
             "requested_longitude": 77.4126,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "Cwa/Aw",
+            "meteorological_regime": "Central Indian Plateau",
+            "elevation_m": 527.0,
+            "is_benchmark": False,
+            "rationale": "Malwa Plateau inland continental climate with distinct seasonal monsoons.",
         },
         "nagpur": {
             "location_id": "nagpur",
@@ -153,6 +203,11 @@ class LocationRegistry:
             "requested_longitude": 79.0882,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "Aw",
+            "meteorological_regime": "Deccan Interior Continental",
+            "elevation_m": 310.0,
+            "is_benchmark": False,
+            "rationale": "Geographic center of India with extreme summer continental heating.",
         },
         "raipur": {
             "location_id": "raipur",
@@ -163,6 +218,11 @@ class LocationRegistry:
             "requested_longitude": 81.6296,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "Aw",
+            "meteorological_regime": "Mahanadi Basin Tropical",
+            "elevation_m": 298.0,
+            "is_benchmark": False,
+            "rationale": "Eastern central plateau basin with high summer humidity and convective storm tracks.",
         },
         # East & North-East
         "kolkata": {
@@ -174,6 +234,11 @@ class LocationRegistry:
             "requested_longitude": 88.3639,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "Aw/Cwa",
+            "meteorological_regime": "Tropical Wet-and-Dry / Deltaic",
+            "elevation_m": 9.0,
+            "is_benchmark": True,
+            "rationale": "Gangetic delta moisture convergence, severe pre-monsoon thunderstorms (Kalbaishakhi/Nor'westers).",
         },
         "bhubaneswar": {
             "location_id": "bhubaneswar",
@@ -184,6 +249,11 @@ class LocationRegistry:
             "requested_longitude": 85.8245,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "Aw",
+            "meteorological_regime": "Eastern Coastal Plains",
+            "elevation_m": 45.0,
+            "is_benchmark": False,
+            "rationale": "Bay of Bengal coastal plain prone to tropical low-pressure depressions and cyclones.",
         },
         "ranchi": {
             "location_id": "ranchi",
@@ -194,6 +264,11 @@ class LocationRegistry:
             "requested_longitude": 85.3096,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "Cwa",
+            "meteorological_regime": "Chota Nagpur Plateau",
+            "elevation_m": 651.0,
+            "is_benchmark": False,
+            "rationale": "Forested plateau elevation providing moderate temperatures and localized convective showers.",
         },
         "guwahati": {
             "location_id": "guwahati",
@@ -204,6 +279,11 @@ class LocationRegistry:
             "requested_longitude": 91.7362,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "Cwa",
+            "meteorological_regime": "Subtropical Valley / Monsoonal",
+            "elevation_m": 55.0,
+            "is_benchmark": True,
+            "rationale": "Brahmaputra river valley microclimate, extreme monsoon precipitation volume, persistent orographic cloud cover.",
         },
         # South
         "bengaluru": {
@@ -215,6 +295,11 @@ class LocationRegistry:
             "requested_longitude": 77.5946,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "Aw",
+            "meteorological_regime": "Elevated Interior Plateau",
+            "elevation_m": 920.0,
+            "is_benchmark": True,
+            "rationale": "High-elevation Deccan plateau, mild diurnal thermal cycle, localized afternoon orographic convection.",
         },
         "chennai": {
             "location_id": "chennai",
@@ -225,6 +310,11 @@ class LocationRegistry:
             "requested_longitude": 80.2707,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "As/Aw",
+            "meteorological_regime": "Tropical Maritime / Coromandel Coast",
+            "elevation_m": 7.0,
+            "is_benchmark": True,
+            "rationale": "Northeast retreating monsoon dominance, maritime thermal buffering, coastal cyclonic vulnerability.",
         },
         "hyderabad": {
             "location_id": "hyderabad",
@@ -235,6 +325,11 @@ class LocationRegistry:
             "requested_longitude": 78.4867,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "BSh/Aw",
+            "meteorological_regime": "Telangana Semi-Arid Plateau",
+            "elevation_m": 542.0,
+            "is_benchmark": False,
+            "rationale": "Inland Deccan plateau with high diurnal temperature variations and seasonal monsoons.",
         },
         "kochi": {
             "location_id": "kochi",
@@ -245,6 +340,11 @@ class LocationRegistry:
             "requested_longitude": 76.2673,
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
+            "climate_zone": "Am",
+            "meteorological_regime": "Malabar Coast Monsoon Gateway",
+            "elevation_m": 4.0,
+            "is_benchmark": False,
+            "rationale": "Southwest monsoon onset gateway with high year-round relative humidity and heavy rainfall.",
         },
     }
 
@@ -297,6 +397,11 @@ class LocationRegistry:
             requested_coordinates=LocationCoordinates(latitude=req_lat, longitude=req_lon),
             actual_grid_coordinates=actual_coords,
             spatial_distance_km=dist_km,
+            climate_zone=cfg.get("climate_zone"),
+            meteorological_regime=cfg.get("meteorological_regime"),
+            elevation_m=cfg.get("elevation_m"),
+            is_benchmark=cfg.get("is_benchmark", False),
+            rationale=cfg.get("rationale"),
         )
 
     def list_locations(self) -> List[Dict[str, Any]]:
@@ -305,4 +410,53 @@ class LocationRegistry:
         for loc_id in sorted(self._locations.keys()):
             info = self.get_location(loc_id)
             results.append(info.to_dict())
+        return results
+
+    def list_benchmark_locations(self) -> List[Dict[str, Any]]:
+        """Return list of the 8 core Phase 2 benchmark locations."""
+        results = []
+        for loc_id in sorted(self._locations.keys()):
+            if self._locations[loc_id].get("is_benchmark", False):
+                info = self.get_location(loc_id)
+                results.append(info.to_dict())
+        return results
+
+    def is_benchmark_location(self, location_id: str) -> bool:
+        """Check if a location belongs to the core Phase 2 benchmark set."""
+        loc_key = location_id.strip().lower()
+        if loc_key not in self._locations:
+            return False
+        return bool(self._locations[loc_key].get("is_benchmark", False))
+
+    def get_climate_zone(self, location_id: str) -> Optional[str]:
+        """Retrieve the Köppen climate zone descriptor for a registered location."""
+        loc_key = location_id.strip().lower()
+        if loc_key not in self._locations:
+            raise KeyError(f"Unknown location_id '{location_id}'")
+        return self._locations[loc_key].get("climate_zone")
+
+    def get_meteorological_regime(self, location_id: str) -> Optional[str]:
+        """Retrieve the meteorological regime descriptor for a registered location."""
+        loc_key = location_id.strip().lower()
+        if loc_key not in self._locations:
+            raise KeyError(f"Unknown location_id '{location_id}'")
+        return self._locations[loc_key].get("meteorological_regime")
+
+    def get_locations_by_region(self, region: str) -> List[Dict[str, Any]]:
+        """Filter registered locations by state_region or broad geographical zone."""
+        region_clean = region.strip().lower()
+        results = []
+        for loc_id, cfg in self._locations.items():
+            if region_clean in cfg.get("state_region", "").lower():
+                results.append(self.get_location(loc_id).to_dict())
+        return results
+
+    def get_locations_by_climate(self, climate_zone: str) -> List[Dict[str, Any]]:
+        """Filter registered locations by Köppen climate zone substring."""
+        cz_clean = climate_zone.strip().upper()
+        results = []
+        for loc_id, cfg in self._locations.items():
+            cz = cfg.get("climate_zone", "").upper()
+            if cz_clean in cz:
+                results.append(self.get_location(loc_id).to_dict())
         return results
