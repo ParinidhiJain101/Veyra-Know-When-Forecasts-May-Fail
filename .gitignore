@@ -30,7 +30,14 @@ htmlcov/
 
 # Environment & Secrets
 .env
-.env.local
+.env.*
+*.env
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.*
+secrets.*
 
 # Weather Data Files (Raw & Processed) - CRITICAL: Never commit large datasets
 data/raw/*
@@ -44,10 +51,12 @@ data/features/*
 data/cache/*
 !data/cache/.gitkeep
 
-# IDE
+# IDE & OS
 .vscode/
 .idea/
 *.swp
+.DS_Store
+Thumbs.db
 
 # Local investigation / tooling
 scratch/
