@@ -311,7 +311,7 @@ class UnifiedOperationalRiskEngine:
             instability_detected=instab_detected,
             risk_velocity=risk_vel,
             time_to_critical_hours=time_to_crit,
-            is_abstained_explicit=(sanitized_nov >= 2.50 or sanitized_conf < 0.25),
+            is_abstained_explicit=False,
         )
 
         # 9. Explainable AI (XAI) Engine (Day 17)

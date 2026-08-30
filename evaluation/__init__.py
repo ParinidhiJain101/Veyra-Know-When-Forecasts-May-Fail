@@ -109,6 +109,23 @@ from evaluation.unified_schema import (
 )
 from evaluation.signal_arbitration import SignalArbitrationEngine
 from evaluation.operational_intelligence_pipeline import UnifiedOperationalRiskEngine
+from evaluation.operational_trace_schema import (
+    ArbitrationSummary,
+    AuditValidationResult,
+    AuditValidationState,
+    CompletenessStatus,
+    CycleChangeSummary,
+    DecisionReconstruction,
+    DecisionSnapshot,
+    DecisionStabilityState,
+    OperationalTrace,
+    PostHocOutcomeRecord,
+    SubsystemSignalsSummary,
+    TraceIdentity,
+)
+from evaluation.decision_stability import CycleChangeDetector, DecisionStabilityAnalyzer
+from evaluation.decision_audit import DecisionAuditValidator
+from evaluation.operational_observability import OperationalObservabilityEngine
 
 __all__ = [
     "HeldOutSplit",
@@ -142,10 +159,12 @@ __all__ = [
     "OperationalDecision",
     "WarningPriority",
     "DataQualityState",
+    "DataQualityAuditResult",
+    "DataQualityAuditor",
     "EvidenceItem",
     "EvidenceFusionEngine",
     "AbstentionController",
-    "DataQualityAuditor",
+    "DecisionSensitivityResult",
     "DecisionSensitivityAnalyzer",
     "TrajectoryState",
     "WarningHorizon",
@@ -204,4 +223,20 @@ __all__ = [
     "UnifiedOperationalAssessment",
     "SignalArbitrationEngine",
     "UnifiedOperationalRiskEngine",
+    "CompletenessStatus",
+    "DecisionStabilityState",
+    "AuditValidationState",
+    "TraceIdentity",
+    "DecisionSnapshot",
+    "SubsystemSignalsSummary",
+    "ArbitrationSummary",
+    "CycleChangeSummary",
+    "AuditValidationResult",
+    "DecisionReconstruction",
+    "PostHocOutcomeRecord",
+    "OperationalTrace",
+    "CycleChangeDetector",
+    "DecisionStabilityAnalyzer",
+    "DecisionAuditValidator",
+    "OperationalObservabilityEngine",
 ]
