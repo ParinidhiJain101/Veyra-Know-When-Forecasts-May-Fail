@@ -9,7 +9,9 @@ Provides:
 - GeneralizationResult: Structured result container.
 """
 
-from evaluation.generalization import GeneralizationEvaluator, GeneralizationResult
+from evaluation.calibration import ProbabilityCalibrator, ReliabilityAnalyzer
+from evaluation.empirical_engine import EmpiricalEvidenceEngine, EmpiricalExperimentManifest
+from evaluation.generalization import GeneralizationEvaluator, GeneralizationResult, compute_dataset_content_hash
 from evaluation.metrics import GeneralizationMetrics
 from evaluation.splits import ClimateHeldOutSplitter, HeldOutSplit, LocationHeldOutSplitter
 
@@ -20,4 +22,9 @@ __all__ = [
     "GeneralizationMetrics",
     "GeneralizationEvaluator",
     "GeneralizationResult",
+    "compute_dataset_content_hash",
+    "ProbabilityCalibrator",
+    "ReliabilityAnalyzer",
+    "EmpiricalEvidenceEngine",
+    "EmpiricalExperimentManifest",
 ]
