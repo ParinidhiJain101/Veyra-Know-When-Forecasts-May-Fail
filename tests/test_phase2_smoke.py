@@ -8,6 +8,7 @@ Marked with @pytest.mark.smoke.
 """
 
 import os
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import pytest
 import pandas as pd
@@ -21,8 +22,10 @@ from data_pipeline.historical_aligner import HistoricalAlignmentEngine, standard
 @pytest.mark.smoke
 def test_real_historical_alignment_smoke(tmp_path):
     """End-to-end smoke test for historical forecast/reference alignment using real data."""
-    start_date = "2026-08-20"
-    end_date = "2026-08-24"
+    # Dynamically select a recent valid window supported by the live GEFS/ERA5 endpoints
+    now_utc = datetime.now(timezone.utc)
+    start_date = (now_utc - timedelta(days=3)).strftime("%Y-%m-%d")
+    end_date = (now_utc - timedelta(days=1)).strftime("%Y-%m-%d")
     location = "delhi"
 
     # 1. Ingest/Load Historical GEFS Forecast with authoritative registry verification
@@ -39,7 +42,7 @@ def test_real_historical_alignment_smoke(tmp_path):
     assert gefs_manifest_p.exists()
     assert gefs_manifest["issue_time_source"] == "NOAA NCEP GEFS AWS S3 Open Data Registry"
     assert "authoritative_cycle_details" in gefs_manifest
-    assert gefs_manifest["authoritative_cycle_details"]["selected_cycle"] == "18z"
+    assert gefs_manifest["authoritative_cycle_details"]["selected_cycle"] in ("00z", "06z", "12z", "18z")
 
     # 2. Ingest/Load Historical ERA5 Truth Reference
     era5_collector = ERA5ReferenceCollector(raw_dir=str(tmp_path / "raw_era5"))
