@@ -101,6 +101,14 @@ from evaluation.event_tracker import EventLifecycleStateMachine, OperationalEven
 from evaluation.event_memory import EventMemoryStore
 from evaluation.event_outcome import EventOutcomeEvaluator
 from evaluation.event_intelligence import EventIntelligenceOrchestrator
+from evaluation.unified_schema import (
+    AssessmentStatus,
+    SignalOverrideRecord,
+    SignalPrecedenceTier,
+    UnifiedOperationalAssessment,
+)
+from evaluation.signal_arbitration import SignalArbitrationEngine
+from evaluation.operational_intelligence_pipeline import UnifiedOperationalRiskEngine
 
 __all__ = [
     "HeldOutSplit",
@@ -190,4 +198,10 @@ __all__ = [
     "EventMemoryStore",
     "EventOutcomeEvaluator",
     "EventIntelligenceOrchestrator",
+    "AssessmentStatus",
+    "SignalPrecedenceTier",
+    "SignalOverrideRecord",
+    "UnifiedOperationalAssessment",
+    "SignalArbitrationEngine",
+    "UnifiedOperationalRiskEngine",
 ]

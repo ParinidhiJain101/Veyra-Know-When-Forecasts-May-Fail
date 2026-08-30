@@ -248,7 +248,7 @@ Probability calibration is fitted strictly on training partition logits using Pl
 
 ## 15. Failure Cases & Limitations
 
-1. **False Negatives (Unwarned Busts — 18.2% of busts)**:
+1. **False Negatives (Unwarned Busts — Reconciled Benchmark Scope)**:
    - Concentrated in early lead hours ($0\text{–}6\text{h}$) where ensemble spread was temporarily narrow before rapid convective development occurred.
 2. **False Positives (Overconfident Alarms — 4.8% of non-busts)**:
    - Concentrated in complex elevation transitions where rapid model revisions occurred without producing ground-level surface busts.
