@@ -52,3 +52,17 @@ data/cache/*
 # Local investigation / tooling
 scratch/
 
+# Binary & Dataset Artifacts
+*.joblib
+*.pkl
+*.parquet
+*.grib
+*.grib2
+*.nc
+*.h5
+*.hdf5
+
+# Model Artifacts
+models/*
+!models/.gitkeep
+
