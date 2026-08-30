@@ -49,6 +49,21 @@ from evaluation.profiles import LocationRegimeProfiler
 from evaluation.risk_confidence import RiskConfidenceEngine
 from evaluation.splits import ClimateHeldOutSplitter, HeldOutSplit, LocationHeldOutSplitter
 from evaluation.uncertainty import UncertaintyDecomposer
+from evaluation.trajectory_schema import (
+    ForecastTrajectory,
+    ForecastTrajectoryPoint,
+    TrajectoryAssessment,
+    TrajectoryState,
+    WarningHorizon,
+)
+from evaluation.temporal_features import TemporalFeatureExtractor
+from evaluation.instability_detector import ForecastInstabilityDetector, InstabilitySignal
+from evaluation.trajectory_state_machine import TrajectoryStateMachine
+from evaluation.time_to_risk import TimeToCriticalRiskEstimator, TimeToRiskEstimate
+from evaluation.early_warning_score import TemporalEarlyWarningScore
+from evaluation.trajectory_analogues import HistoricalTrajectoryRetriever
+from evaluation.event_evaluation import EventEvaluationSummary, EventLevelEvaluator, WarningHysteresisFilter
+from evaluation.temporal_early_warning_engine import TemporalEarlyWarningEngine
 
 __all__ = [
     "HeldOutSplit",
@@ -87,4 +102,21 @@ __all__ = [
     "AbstentionController",
     "DataQualityAuditor",
     "DecisionSensitivityAnalyzer",
+    "TrajectoryState",
+    "WarningHorizon",
+    "ForecastTrajectoryPoint",
+    "ForecastTrajectory",
+    "TrajectoryAssessment",
+    "TemporalFeatureExtractor",
+    "ForecastInstabilityDetector",
+    "InstabilitySignal",
+    "TrajectoryStateMachine",
+    "TimeToCriticalRiskEstimator",
+    "TimeToRiskEstimate",
+    "TemporalEarlyWarningScore",
+    "HistoricalTrajectoryRetriever",
+    "EventEvaluationSummary",
+    "WarningHysteresisFilter",
+    "EventLevelEvaluator",
+    "TemporalEarlyWarningEngine",
 ]
