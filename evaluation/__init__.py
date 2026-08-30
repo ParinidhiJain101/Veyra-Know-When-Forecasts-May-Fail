@@ -85,6 +85,22 @@ from evaluation.xai_attribution import XAIAttributionEngine
 from evaluation.xai_counterfactual import DecisionCounterfactualGenerator
 from evaluation.xai_renderer import XAIRenderer
 from evaluation.xai_engine import ExplainableForecastEngine
+from evaluation.event_schema import (
+    EventEvaluationMetrics,
+    EventLifecycleState,
+    EventOutcome,
+    EventOutcomeStatus,
+    EventSeverity,
+    EventSimilarityMatch,
+    EventStateTransition,
+    EventTrajectorySnapshot,
+    OperationalEvent,
+    OperationalUrgency,
+)
+from evaluation.event_tracker import EventLifecycleStateMachine, OperationalEventTracker
+from evaluation.event_memory import EventMemoryStore
+from evaluation.event_outcome import EventOutcomeEvaluator
+from evaluation.event_intelligence import EventIntelligenceOrchestrator
 
 __all__ = [
     "HeldOutSplit",
@@ -159,4 +175,19 @@ __all__ = [
     "DecisionCounterfactualGenerator",
     "XAIRenderer",
     "ExplainableForecastEngine",
+    "EventLifecycleState",
+    "EventSeverity",
+    "OperationalUrgency",
+    "EventOutcomeStatus",
+    "EventStateTransition",
+    "EventTrajectorySnapshot",
+    "EventSimilarityMatch",
+    "EventOutcome",
+    "OperationalEvent",
+    "EventEvaluationMetrics",
+    "EventLifecycleStateMachine",
+    "OperationalEventTracker",
+    "EventMemoryStore",
+    "EventOutcomeEvaluator",
+    "EventIntelligenceOrchestrator",
 ]
