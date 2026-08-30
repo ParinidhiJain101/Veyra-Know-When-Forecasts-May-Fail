@@ -421,6 +421,17 @@ class LocationRegistry:
                 results.append(info.to_dict())
         return results
 
+    def get_all_location_ids(self) -> List[str]:
+        """Return list of all registered location IDs."""
+        return sorted(list(self._locations.keys()))
+
+    def get_benchmark_location_ids(self) -> List[str]:
+        """Return list of all 8 core benchmark location IDs."""
+        return sorted([
+            loc_id for loc_id, cfg in self._locations.items()
+            if cfg.get("is_benchmark", False)
+        ])
+
     def has_location(self, location_id: str) -> bool:
         """Check if a location_id is currently registered."""
         return location_id.strip().lower() in self._locations

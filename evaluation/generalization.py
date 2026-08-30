@@ -57,6 +57,7 @@ class GeneralizationResult:
     train_climate_regimes: List[str]
     held_out_climate_regimes: List[str]
     sample_count: int
+    forecast_run_count: int
     positive_count: int
     negative_count: int
     metrics: Dict[str, Any]
@@ -197,9 +198,22 @@ class GeneralizationEvaluator:
             p_train = model.predict(X_train)
             p_test = model.predict(X_test)
 
+        # Extract run IDs and lead hours for dependence-aware grouped diagnostics
+        run_cols = [c for c in ["location_id", "variable", "issue_time_utc", "cycle"] if c in df_test_work.columns]
+        test_run_ids = df_test_work[run_cols].astype(str).agg("_".join, axis=1) if len(run_cols) >= 2 else None
+        test_leads = df_test_work["lead_hours"].values if "lead_hours" in df_test_work.columns else None
+
+        train_run_cols = [c for c in ["location_id", "variable", "issue_time_utc", "cycle"] if c in df_train_work.columns]
+        train_run_ids = df_train_work[train_run_cols].astype(str).agg("_".join, axis=1) if len(train_run_cols) >= 2 else None
+        train_leads = df_train_work["lead_hours"].values if "lead_hours" in df_train_work.columns else None
+
         # 4. Compute Test and In-Sample Metrics
-        test_metrics = GeneralizationMetrics.evaluate_predictions(y_test, p_test, threshold=threshold)
-        train_metrics = GeneralizationMetrics.evaluate_predictions(y_train, p_train, threshold=threshold)
+        test_metrics = GeneralizationMetrics.evaluate_predictions(
+            y_test, p_test, threshold=threshold, run_ids=test_run_ids, lead_hours=test_leads
+        )
+        train_metrics = GeneralizationMetrics.evaluate_predictions(
+            y_train, p_train, threshold=threshold, run_ids=train_run_ids, lead_hours=train_leads
+        )
 
         # 5. Fit & Evaluate Standard Baselines on Test Set
         baseline_metrics = self._evaluate_baselines(X_train, y_train, X_test, y_test, threshold=threshold)
@@ -211,10 +225,15 @@ class GeneralizationEvaluator:
         train_content_hash = compute_dataset_content_hash(df_train_work)
         test_content_hash = compute_dataset_content_hash(df_test_work)
 
+        forecast_run_cnt = int(test_run_ids.nunique()) if test_run_ids is not None else len(df_test_work)
+        records_per_run = round(len(df_test_work) / max(forecast_run_cnt, 1), 2)
+
         provenance = {
             "timestamp_utc": datetime.now(timezone.utc).isoformat(),
             "train_row_count": len(df_train_work),
             "test_row_count": len(df_test_work),
+            "test_forecast_run_count": forecast_run_cnt,
+            "records_per_run_avg": records_per_run,
             "train_content_sha256": train_content_hash,
             "test_content_sha256": test_content_hash,
             "feature_hash_sha256": hashlib.sha256(",".join(feat_cols).encode("utf-8")).hexdigest(),
@@ -230,6 +249,7 @@ class GeneralizationEvaluator:
             train_climate_regimes=split.train_climates,
             held_out_climate_regimes=split.held_out_climates,
             sample_count=len(y_test),
+            forecast_run_count=forecast_run_cnt,
             positive_count=int(y_test.sum()),
             negative_count=int(len(y_test) - y_test.sum()),
             metrics=test_metrics,

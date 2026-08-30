@@ -86,6 +86,12 @@ class IssueTimeSafeFeaturePipeline:
         df = df_forecast.copy()
 
         # Normalize column names if needed
+        if "location_id" in df.columns and "location" not in df.columns:
+            df["location"] = df["location_id"]
+        if "issue_time_utc" in df.columns and "issue_time" not in df.columns:
+            df["issue_time"] = df["issue_time_utc"]
+        if "valid_time_utc" in df.columns and "valid_time" not in df.columns:
+            df["valid_time"] = df["valid_time_utc"]
         if "value" in df.columns and "forecast_value" not in df.columns:
             df["forecast_value"] = df["value"]
         if "ensemble_std" not in df.columns:

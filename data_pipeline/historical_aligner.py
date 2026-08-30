@@ -53,6 +53,69 @@ PAIRED_DATASET_COLUMNS = [
 ]
 
 
+VALID_CANONICAL_CYCLES = {"00z", "06z", "12z", "18z"}
+
+
+def derive_canonical_cycle(
+    issue_time: Union[str, datetime, pd.Timestamp, pd.Series],
+    cycle: Optional[Union[str, pd.Series]] = None,
+) -> Union[str, pd.Series]:
+    """
+    Derive, normalize, and validate the canonical forecast cycle ('00z', '06z', '12z', '18z').
+
+    Rules:
+    - If cycle is provided and non-null:
+        - Normalize to lowercase, stripped string.
+        - Validate that all values belong to {'00z', '06z', '12z', '18z'}.
+        - If any value is invalid, raise ValueError with clear message.
+    - If cycle is absent or null:
+        - Derive strictly from issue_time in UTC: issue_time.hour -> f"{hour:02d}z".
+        - Validate that derived cycle belongs to {'00z', '06z', '12z', '18z'}.
+        - If non-synoptic hour, raise ValueError.
+    """
+    if isinstance(issue_time, pd.Series):
+        issue_times_dt = pd.to_datetime(issue_time, utc=True)
+        if cycle is not None and isinstance(cycle, pd.Series) and not cycle.isna().all():
+            norm_cycle = cycle.astype(str).str.strip().str.lower()
+            if cycle.isna().any():
+                derived = issue_times_dt.dt.strftime("%Hz").str.lower()
+                norm_cycle = norm_cycle.where(~cycle.isna(), derived)
+
+            invalid = norm_cycle[~norm_cycle.isin(VALID_CANONICAL_CYCLES)]
+            if len(invalid) > 0:
+                raise ValueError(
+                    f"Invalid forecast cycle values detected: {invalid.unique().tolist()}. "
+                    f"Must be one of {sorted(VALID_CANONICAL_CYCLES)}."
+                )
+            return norm_cycle
+        else:
+            derived = issue_times_dt.dt.strftime("%Hz").str.lower()
+            invalid = derived[~derived.isin(VALID_CANONICAL_CYCLES)]
+            if len(invalid) > 0:
+                raise ValueError(
+                    f"Derived invalid forecast cycle values from issue_time: {invalid.unique().tolist()}. "
+                    f"Must be one of {sorted(VALID_CANONICAL_CYCLES)}."
+                )
+            return derived
+    else:
+        if cycle is not None and not (isinstance(cycle, float) and np.isnan(cycle)) and str(cycle).strip() != "":
+            norm = str(cycle).strip().lower()
+            if norm not in VALID_CANONICAL_CYCLES:
+                raise ValueError(
+                    f"Invalid forecast cycle '{cycle}'. Must be one of {sorted(VALID_CANONICAL_CYCLES)}."
+                )
+            return norm
+        else:
+            dt = pd.to_datetime(issue_time, utc=True)
+            derived = f"{dt.hour:02d}z"
+            if derived not in VALID_CANONICAL_CYCLES:
+                raise ValueError(
+                    f"Derived cycle '{derived}' from issue time '{dt}' is not a valid synoptic cycle. "
+                    f"Must be one of {sorted(VALID_CANONICAL_CYCLES)}."
+                )
+            return derived
+
+
 def haversine_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calculate great-circle distance between two coordinates in kilometers."""
     r = 6371.0  # Earth radius in km
@@ -404,8 +467,10 @@ class MultiClimateDatasetBuilder:
         if "lead_days" not in df.columns:
             df["lead_days"] = df["lead_hours"] // 24
 
-        if "cycle" not in df.columns:
-            df["cycle"] = df["issue_time_utc"].dt.strftime("%Hz").str.lower()
+        if "cycle" in df.columns and not df["cycle"].isna().all():
+            df["cycle"] = derive_canonical_cycle(df["issue_time_utc"], df["cycle"])
+        else:
+            df["cycle"] = derive_canonical_cycle(df["issue_time_utc"])
 
         if "has_full_ensemble" not in df.columns:
             df["has_full_ensemble"] = df["member_count"] >= 31
