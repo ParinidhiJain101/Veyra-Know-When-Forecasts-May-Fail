@@ -421,6 +421,137 @@ class LocationRegistry:
                 results.append(info.to_dict())
         return results
 
+    def has_location(self, location_id: str) -> bool:
+        """Check if a location_id is currently registered."""
+        return location_id.strip().lower() in self._locations
+
+    def register_location(
+        self,
+        location_id: str,
+        requested_latitude: float,
+        requested_longitude: float,
+        country: str = "India",
+        state_region: str = "Custom Region",
+        city: Optional[str] = None,
+        verified_grid_latitude: Optional[float] = None,
+        verified_grid_longitude: Optional[float] = None,
+        climate_zone: Optional[str] = None,
+        meteorological_regime: Optional[str] = None,
+        elevation_m: Optional[float] = None,
+        is_benchmark: bool = False,
+        rationale: Optional[str] = None,
+    ) -> LocationInfo:
+        """
+        Dynamically register a new monitoring location into the registry at runtime.
+
+        Args:
+            location_id: Unique location identifier.
+            requested_latitude: Target latitude in degrees [-90, 90].
+            requested_longitude: Target longitude in degrees [-180, 180].
+            country: Country name.
+            state_region: State or administrative region.
+            city: City name (defaults to capitalized location_id).
+            verified_grid_latitude: Optional verified NWP grid latitude.
+            verified_grid_longitude: Optional verified NWP grid longitude.
+            climate_zone: Optional Köppen climate zone tag.
+            meteorological_regime: Optional physical regime descriptor.
+            elevation_m: Optional elevation in meters above sea level.
+            is_benchmark: True if part of the scientific benchmark subset.
+            rationale: Optional rationale for inclusion.
+
+        Returns:
+            LocationInfo dataclass for the newly registered location.
+        """
+        if not isinstance(location_id, str) or not location_id.strip():
+            raise ValueError(f"Invalid location_id '{location_id}'. Must be a non-empty string.")
+
+        loc_key = location_id.strip().lower()
+
+        # Validate coordinate finiteness and physical bounds
+        try:
+            req_lat_f = float(requested_latitude)
+            req_lon_f = float(requested_longitude)
+        except (TypeError, ValueError) as err:
+            raise ValueError(f"Requested coordinates must be valid numbers: {err}") from err
+
+        if math.isnan(req_lat_f) or math.isinf(req_lat_f) or req_lat_f < -90.0 or req_lat_f > 90.0:
+            raise ValueError(f"Invalid requested_latitude: {requested_latitude}. Must be finite and in [-90.0, 90.0].")
+        if math.isnan(req_lon_f) or math.isinf(req_lon_f) or req_lon_f < -180.0 or req_lon_f > 180.0:
+            raise ValueError(f"Invalid requested_longitude: {requested_longitude}. Must be finite and in [-180.0, 180.0].")
+
+        # Benchmark protection: prevent accidental overwrite of core benchmark locations with differing coordinates
+        if self.is_benchmark_location(loc_key):
+            existing_cfg = self._locations[loc_key]
+            existing_lat = existing_cfg["requested_latitude"]
+            existing_lon = existing_cfg["requested_longitude"]
+            if not (math.isclose(existing_lat, req_lat_f, abs_tol=1e-4) and math.isclose(existing_lon, req_lon_f, abs_tol=1e-4)):
+                raise ValueError(
+                    f"Cannot overwrite protected benchmark location '{loc_key}' with differing coordinates "
+                    f"(existing: {existing_lat}, {existing_lon}; requested: {req_lat_f}, {req_lon_f})."
+                )
+            # If coordinates match, idempotent call returns existing location
+            return self.get_location(loc_key)
+
+        city_name = city or loc_key.capitalize()
+
+        self._locations[loc_key] = {
+            "location_id": loc_key,
+            "country": country,
+            "state_region": state_region,
+            "city": city_name,
+            "requested_latitude": req_lat_f,
+            "requested_longitude": req_lon_f,
+            "verified_grid_latitude": float(verified_grid_latitude) if verified_grid_latitude is not None else None,
+            "verified_grid_longitude": float(verified_grid_longitude) if verified_grid_longitude is not None else None,
+            "climate_zone": climate_zone,
+            "meteorological_regime": meteorological_regime,
+            "elevation_m": float(elevation_m) if elevation_m is not None else None,
+            "is_benchmark": bool(is_benchmark),
+            "rationale": rationale,
+        }
+
+        return self.get_location(loc_key)
+
+    def resolve_location(
+        self,
+        location_id_or_name: str,
+        latitude: Optional[float] = None,
+        longitude: Optional[float] = None,
+        **kwargs: Any,
+    ) -> LocationInfo:
+        """
+        Resolve a location by ID if registered, or dynamically register it if coordinates are supplied.
+
+        Args:
+            location_id_or_name: Location identifier or name.
+            latitude: Latitude (required if location is not already registered).
+            longitude: Longitude (required if location is not already registered).
+            **kwargs: Optional metadata fields passed to register_location.
+
+        Returns:
+            LocationInfo dataclass.
+        """
+        if not isinstance(location_id_or_name, str) or not location_id_or_name.strip():
+            raise ValueError(f"Invalid location_id_or_name '{location_id_or_name}'. Must be a non-empty string.")
+
+        loc_key = location_id_or_name.strip().lower()
+        if self.has_location(loc_key):
+            actual_grid_lat = kwargs.get("actual_grid_lat")
+            actual_grid_lon = kwargs.get("actual_grid_lon")
+            return self.get_location(loc_key, actual_grid_lat=actual_grid_lat, actual_grid_lon=actual_grid_lon)
+
+        if latitude is not None and longitude is not None:
+            return self.register_location(
+                location_id=loc_key,
+                requested_latitude=latitude,
+                requested_longitude=longitude,
+                **kwargs,
+            )
+
+        raise KeyError(
+            f"Location '{location_id_or_name}' is not registered and no coordinates were supplied to register it on-the-fly."
+        )
+
     def is_benchmark_location(self, location_id: str) -> bool:
         """Check if a location belongs to the core Phase 2 benchmark set."""
         loc_key = location_id.strip().lower()

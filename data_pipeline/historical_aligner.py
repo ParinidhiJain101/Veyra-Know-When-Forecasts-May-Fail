@@ -414,7 +414,7 @@ class MultiClimateDatasetBuilder:
         loc_keys = df["location_id"].unique()
         loc_meta_map = {}
         for loc in loc_keys:
-            try:
+            if self.location_registry.has_location(loc):
                 info = self.location_registry.get_location(loc)
                 loc_meta_map[loc] = {
                     "region": info.state_region,
@@ -422,18 +422,57 @@ class MultiClimateDatasetBuilder:
                     "meteorological_regime": info.meteorological_regime or "UNKNOWN",
                     "elevation_m": info.elevation_m if info.elevation_m is not None else np.nan,
                 }
-            except Exception:
+            else:
+                # Check if the slice dataframe itself provided region / climate_zone / elevation_m
+                sub_loc = df[df["location_id"] == loc]
+                provided_reg = sub_loc["region"].dropna().iloc[0] if "region" in sub_loc.columns and not sub_loc["region"].dropna().empty else "Custom Region"
+                provided_cz = sub_loc["climate_zone"].dropna().iloc[0] if "climate_zone" in sub_loc.columns and not sub_loc["climate_zone"].dropna().empty else "CUSTOM"
+                provided_met = sub_loc["meteorological_regime"].dropna().iloc[0] if "meteorological_regime" in sub_loc.columns and not sub_loc["meteorological_regime"].dropna().empty else "Custom Operational Location"
+                provided_elev = float(sub_loc["elevation_m"].dropna().iloc[0]) if "elevation_m" in sub_loc.columns and not sub_loc["elevation_m"].dropna().empty else np.nan
+
+                # Dynamically register in location registry if latitude and longitude exist
+                if "latitude" in sub_loc.columns and "longitude" in sub_loc.columns:
+                    lat_val = float(sub_loc["latitude"].iloc[0])
+                    lon_val = float(sub_loc["longitude"].iloc[0])
+                    self.location_registry.register_location(
+                        location_id=str(loc),
+                        requested_latitude=lat_val,
+                        requested_longitude=lon_val,
+                        state_region=provided_reg,
+                        city=str(loc).capitalize(),
+                        climate_zone=provided_cz,
+                        meteorological_regime=provided_met,
+                        elevation_m=provided_elev,
+                        is_benchmark=False,
+                        rationale="Dynamically registered operational location during historical ingestion.",
+                    )
+
                 loc_meta_map[loc] = {
-                    "region": "UNKNOWN",
-                    "climate_zone": "UNKNOWN",
-                    "meteorological_regime": "UNKNOWN",
-                    "elevation_m": np.nan,
+                    "region": provided_reg,
+                    "climate_zone": provided_cz,
+                    "meteorological_regime": provided_met,
+                    "elevation_m": provided_elev,
                 }
 
-        df["region"] = df["location_id"].map(lambda x: loc_meta_map.get(x, {}).get("region", "UNKNOWN"))
-        df["climate_zone"] = df["location_id"].map(lambda x: loc_meta_map.get(x, {}).get("climate_zone", "UNKNOWN"))
-        df["meteorological_regime"] = df["location_id"].map(lambda x: loc_meta_map.get(x, {}).get("meteorological_regime", "UNKNOWN"))
-        df["elevation_m"] = df["location_id"].map(lambda x: loc_meta_map.get(x, {}).get("elevation_m", np.nan))
+        if "region" not in df.columns or df["region"].isna().all():
+            df["region"] = df["location_id"].map(lambda x: loc_meta_map.get(x, {}).get("region", "UNKNOWN"))
+        else:
+            df["region"] = df["region"].fillna(df["location_id"].map(lambda x: loc_meta_map.get(x, {}).get("region", "UNKNOWN")))
+
+        if "climate_zone" not in df.columns or df["climate_zone"].isna().all():
+            df["climate_zone"] = df["location_id"].map(lambda x: loc_meta_map.get(x, {}).get("climate_zone", "UNKNOWN"))
+        else:
+            df["climate_zone"] = df["climate_zone"].fillna(df["location_id"].map(lambda x: loc_meta_map.get(x, {}).get("climate_zone", "UNKNOWN")))
+
+        if "meteorological_regime" not in df.columns or df["meteorological_regime"].isna().all():
+            df["meteorological_regime"] = df["location_id"].map(lambda x: loc_meta_map.get(x, {}).get("meteorological_regime", "UNKNOWN"))
+        else:
+            df["meteorological_regime"] = df["meteorological_regime"].fillna(df["location_id"].map(lambda x: loc_meta_map.get(x, {}).get("meteorological_regime", "UNKNOWN")))
+
+        if "elevation_m" not in df.columns or df["elevation_m"].isna().all():
+            df["elevation_m"] = df["location_id"].map(lambda x: loc_meta_map.get(x, {}).get("elevation_m", np.nan))
+        else:
+            df["elevation_m"] = df["elevation_m"].fillna(df["location_id"].map(lambda x: loc_meta_map.get(x, {}).get("elevation_m", np.nan)))
 
         # Reorder and project columns strictly to CANONICAL_HISTORICAL_COLUMNS
         missing_cols = [c for c in CANONICAL_HISTORICAL_COLUMNS if c not in df.columns]
