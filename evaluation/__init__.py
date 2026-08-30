@@ -64,6 +64,27 @@ from evaluation.early_warning_score import TemporalEarlyWarningScore
 from evaluation.trajectory_analogues import HistoricalTrajectoryRetriever
 from evaluation.event_evaluation import EventEvaluationSummary, EventLevelEvaluator, WarningHysteresisFilter
 from evaluation.temporal_early_warning_engine import TemporalEarlyWarningEngine
+from evaluation.xai_schema import (
+    CanonicalXAIExplanation,
+    DecisionCounterfactual,
+    DecisionRationale,
+    DriverCategory,
+    DriverDirection,
+    EvidenceConflictItem,
+    ExplanationLevel,
+    ExplanationMode,
+    FeatureRiskDriver,
+    HistoricalEvidenceAlignment,
+    HistoricalEvidenceExplanation,
+    NoveltyExplanation,
+    TemporalDynamicsExplanation,
+    UncertaintyExplanation,
+    UncertaintySource,
+)
+from evaluation.xai_attribution import XAIAttributionEngine
+from evaluation.xai_counterfactual import DecisionCounterfactualGenerator
+from evaluation.xai_renderer import XAIRenderer
+from evaluation.xai_engine import ExplainableForecastEngine
 
 __all__ = [
     "HeldOutSplit",
@@ -119,4 +140,23 @@ __all__ = [
     "WarningHysteresisFilter",
     "EventLevelEvaluator",
     "TemporalEarlyWarningEngine",
+    "CanonicalXAIExplanation",
+    "ExplanationMode",
+    "ExplanationLevel",
+    "DriverCategory",
+    "DriverDirection",
+    "UncertaintySource",
+    "HistoricalEvidenceAlignment",
+    "FeatureRiskDriver",
+    "UncertaintyExplanation",
+    "NoveltyExplanation",
+    "HistoricalEvidenceExplanation",
+    "EvidenceConflictItem",
+    "TemporalDynamicsExplanation",
+    "DecisionRationale",
+    "DecisionCounterfactual",
+    "XAIAttributionEngine",
+    "DecisionCounterfactualGenerator",
+    "XAIRenderer",
+    "ExplainableForecastEngine",
 ]
