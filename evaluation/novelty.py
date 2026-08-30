@@ -90,11 +90,12 @@ class FeatureNoveltyDetector:
         self.is_fitted_ = True
         return self
 
-    def _compute_raw_scores(self, arr: np.ndarray) -> np.ndarray:
+    def _compute_raw_scores(self, arr: Union[np.ndarray, pd.DataFrame]) -> np.ndarray:
         """Compute normalized robust distance from median center."""
-        n_samples, n_features = arr.shape
+        arr_np = np.asarray(arr, dtype=float)
+        n_samples, n_features = arr_np.shape
         # Impute NaNs with medians for distance calculation
-        imputed = arr.copy()
+        imputed = arr_np.copy()
         for j in range(n_features):
             nan_mask = np.isnan(imputed[:, j])
             imputed[nan_mask, j] = self.medians_[j]

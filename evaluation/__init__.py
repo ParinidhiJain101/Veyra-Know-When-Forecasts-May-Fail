@@ -1,26 +1,44 @@
 """
-Veyra Evaluation & Generalization Framework.
+Veyra Evaluation, Generalization & Decision Intelligence Framework.
 
 Provides:
-- LocationHeldOutSplitter: Location-held-out out-of-domain dataset splitting.
-- ClimateHeldOutSplitter: Climate-held-out regime transfer dataset splitting.
-- GeneralizationMetrics: Comprehensive classification, probabilistic, and risk-utility metrics.
-- GeneralizationEvaluator: Out-of-domain evaluation and cross-validation orchestrator.
-- GeneralizationResult: Structured result container.
-- ProbabilityCalibrator, ReliabilityAnalyzer: Strict train-only calibration and reliability analysis.
+- LocationHeldOutSplitter, ClimateHeldOutSplitter, HeldOutSplit: Splitting engines.
+- GeneralizationMetrics: Classification, probabilistic, and risk-utility metrics.
+- GeneralizationEvaluator, GeneralizationResult: Cross-validation orchestrator.
+- ProbabilityCalibrator, ReliabilityAnalyzer: Train-only calibration & reliability analysis.
 - EmpiricalEvidenceEngine, EmpiricalExperimentManifest: Full empirical benchmark orchestration.
 - FeatureNoveltyDetector: Leakage-safe feature-space novelty and OOD detector.
-- UncertaintyDecomposer: Operational uncertainty decomposition (aleatoric vs epistemic vs instability vs horizon).
+- UncertaintyDecomposer: Operational uncertainty decomposition.
 - HistoricalFailureRetriever: Leakage-safe historical analogue and failure pattern retrieval.
-- ForecastRiskAttributionEngine: Deterministic, model-compatible feature risk attribution.
+- ForecastRiskAttributionEngine: Deterministic feature risk attribution.
 - LocationRegimeProfiler: Station and meteorological regime reliability profiles.
 - RiskConfidenceEngine: Self-confidence and risk-confidence quantification.
 - CompositeFailureExplanation, ForecastFailureExplainer: Master failure explanation pipeline.
+- ForecastRiskDecisionEngine: Master operational forecast-risk decision engine (Day 15).
+- ForecastRiskDecision, RiskDecisionPolicy, ParameterGovernanceClass, ParameterMetadata: Decision schemas and policies.
+- PolicyBenchmarkEvaluator, PolicyBenchmarkSummary: Policy benchmarking and expected cost evaluation.
+- ThresholdSensitivityAnalyzer, DecisionSensitivityAnalyzer: Threshold perturbation and margin analyzer.
+- EvidenceFusionEngine, AbstentionController, DataQualityAuditor: Evidence fusion & safety controllers.
 """
 
+from evaluation.abstention import AbstentionController
 from evaluation.attribution import ForecastRiskAttributionEngine
 from evaluation.calibration import ProbabilityCalibrator, ReliabilityAnalyzer
+from evaluation.data_quality import DataQualityAuditor
+from evaluation.decision_engine import ForecastRiskDecisionEngine
+from evaluation.decision_policy import ParameterGovernanceClass, ParameterMetadata, RiskDecisionPolicy
+from evaluation.decision_policy_evaluator import PolicyBenchmarkEvaluator, PolicyBenchmarkSummary
+from evaluation.decision_schema import (
+    DataQualityState,
+    EvidenceItem,
+    ForecastRiskDecision,
+    OperationalDecision,
+    RiskLevel,
+    WarningPriority,
+)
+from evaluation.decision_sensitivity import DecisionSensitivityAnalyzer, ThresholdSensitivityAnalyzer
 from evaluation.empirical_engine import EmpiricalEvidenceEngine, EmpiricalExperimentManifest
+from evaluation.evidence_fusion import EvidenceFusionEngine
 from evaluation.explanation_engine import ForecastFailureExplainer
 from evaluation.explanation_schema import CompositeFailureExplanation
 from evaluation.failure_patterns import HistoricalFailureRetriever
@@ -52,4 +70,21 @@ __all__ = [
     "RiskConfidenceEngine",
     "CompositeFailureExplanation",
     "ForecastFailureExplainer",
+    "ForecastRiskDecisionEngine",
+    "ForecastRiskDecision",
+    "RiskDecisionPolicy",
+    "ParameterGovernanceClass",
+    "ParameterMetadata",
+    "PolicyBenchmarkEvaluator",
+    "PolicyBenchmarkSummary",
+    "ThresholdSensitivityAnalyzer",
+    "RiskLevel",
+    "OperationalDecision",
+    "WarningPriority",
+    "DataQualityState",
+    "EvidenceItem",
+    "EvidenceFusionEngine",
+    "AbstentionController",
+    "DataQualityAuditor",
+    "DecisionSensitivityAnalyzer",
 ]
