@@ -13,6 +13,11 @@ class CanonicalForecastRecord(BaseModel):
     location: str = Field(..., description="Location name or identifier")
     latitude: float = Field(..., ge=-90.0, le=90.0, description="Geographical latitude in decimal degrees")
     longitude: float = Field(..., ge=-180.0, le=180.0, description="Geographical longitude in decimal degrees")
+
+    # Actual provider grid cell coordinates, when supplied by the API
+    grid_latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0, description="Provider grid latitude in decimal degrees")
+    grid_longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0, description="Provider grid longitude in decimal degrees")
+
     issue_time: str = Field(..., description="Model initialization / run cycle time (ISO 8601 format)")
     valid_time: str = Field(..., description="Target forecast verification time (ISO 8601 format)")
     lead_hours: int = Field(..., ge=0, description="Lead time in hours between issue_time and valid_time")
@@ -20,6 +25,10 @@ class CanonicalForecastRecord(BaseModel):
     unit: str = Field(..., description="Standardized unit of measurement (e.g., celsius, hPa, m/s)")
     value: Optional[float] = Field(default=None, description="Deterministic or control forecast value")
     source: str = Field(default="NOAA_GEFS_OPENMETEO", description="Source forecast model / provider")
+
+    # Model/run provenance
+    model: Optional[str] = Field(default=None, description="Model identifier (e.g. gfs_seamless)")
+    model_run: Optional[str] = Field(default=None, description="Model run initialization cycle")
 
     # Ensemble summary metrics (populated when available)
     member_id: Optional[str] = Field(default=None, description="Ensemble member identifier if member-level data")
@@ -46,7 +55,17 @@ class CanonicalForecastDataset(BaseModel):
     location: str = Field(..., description="Target geographical location")
     latitude: float = Field(..., description="Latitude")
     longitude: float = Field(..., description="Longitude")
+
+    # Provider grid provenance
+    grid_latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0, description="Provider grid latitude in decimal degrees")
+    grid_longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0, description="Provider grid longitude in decimal degrees")
+
     issue_time: str = Field(..., description="Forecast issue / initialization cycle")
     source: str = Field(default="NOAA_GEFS_OPENMETEO", description="Forecast data source")
+
+    # Model/run provenance
+    model: Optional[str] = Field(default=None, description="Model identifier")
+    model_run: Optional[str] = Field(default=None, description="Model run initialization cycle")
+
     records: list[CanonicalForecastRecord] = Field(default_factory=list, description="List of time-step records")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Dataset metadata and provider headers")

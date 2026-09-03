@@ -1,4 +1,4 @@
-"""Automated Unit Tests for Day 6 Live Model Serving & End-to-End Prediction Pipeline."""
+"""Automated tests for live model serving and inference pipeline."""
 import tempfile
 import numpy as np
 import pytest
@@ -46,7 +46,7 @@ def _create_mock_weather_result(location: str = "London") -> WeatherResult:
     return WeatherResult(
         location=location,
         raw_data=dataset.model_dump(),
-        data_version="gefs-openmeteo-v1.0",
+        data_version="gfs-ensemble-openmeteo-v2.0",
         is_available=True,
         quality_flags={"qc_passed": True},
     )
@@ -123,12 +123,12 @@ def test_end_to_end_agent_live_prediction():
     assert response.location == "London"
     assert response.bust_probability is not None
     assert 0.0 <= response.bust_probability <= 1.0
-    assert response.risk_level in [RiskLevel.LOW, RiskLevel.MEDIUM, RiskLevel.HIGH, RiskLevel.CRITICAL]
+    assert response.risk_level in [RiskLevel.LOW, RiskLevel.ELEVATED, RiskLevel.MEDIUM, RiskLevel.HIGH, RiskLevel.CRITICAL]
     assert response.trust_state == TrustState.HIGH_CONFIDENCE
     assert response.abstain is False
     assert response.reason_codes == [ReasonCode.SUCCESS.value]
     assert response.model_version == "baseline-logistic-v1.0"
-    assert response.data_version == "gefs-openmeteo-v1.0"
+    assert response.data_version == "gfs-ensemble-openmeteo-v2.0"
 
 
 def test_end_to_end_predict_endpoint_with_live_pipeline(client: TestClient):

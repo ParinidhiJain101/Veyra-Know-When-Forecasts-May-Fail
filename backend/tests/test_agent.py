@@ -1,5 +1,6 @@
-"""Unit tests for ForecastBustAgent orchestrator, dependency injection, and short-circuiting."""
+"""Comprehensive unit tests for ForecastBustAgent orchestration logic."""
 from unittest.mock import MagicMock
+import pytest
 from backend.app.agents.forecast_bust_agent import ForecastBustAgent
 from backend.app.schemas.prediction import (
     PredictionRequest,
@@ -16,9 +17,6 @@ from backend.app.services.base import (
     ModelResult,
     WeatherResult,
 )
-from backend.app.services.feature_service import UnavailableFeatureService
-from backend.app.services.model_service import UnavailableModelService
-from backend.app.services.weather_service import UnavailableWeatherService
 
 
 def test_agent_unavailable_state_default():
@@ -47,7 +45,7 @@ def test_agent_full_pipeline_mock_injection():
                 location=location,
                 target_date=target_date,
                 raw_data={"temp": 18.5, "humidity": 65},
-                data_version="gefs-mock-v1",
+                data_version="gfs-ensemble-openmeteo-v2.0",
                 is_available=True,
                 quality_flags={"qc_passed": True},
             )
@@ -65,9 +63,9 @@ def test_agent_full_pipeline_mock_injection():
         def predict(self, feature_result: FeatureResult) -> ModelResult:
             return ModelResult(
                 probability=0.35,
-                model_version="prototype-gbm-v1",
+                model_version="veyra-v2-champion-lightgbm",
                 is_ready=True,
-                metadata={"calibration": "isotonic"},
+                metadata={"calibration": "platt_sigmoid"},
             )
 
     agent = ForecastBustAgent(
@@ -80,11 +78,11 @@ def test_agent_full_pipeline_mock_injection():
 
     assert response.location == "Tokyo"
     assert response.bust_probability == 0.35
-    assert response.risk_level == RiskLevel.MEDIUM
+    assert response.risk_level == RiskLevel.ELEVATED
     assert response.trust_state == TrustState.HIGH_CONFIDENCE
     assert response.abstain is False
-    assert response.model_version == "prototype-gbm-v1"
-    assert response.data_version == "gefs-mock-v1"
+    assert response.model_version == "veyra-v2-champion-lightgbm"
+    assert response.data_version == "gfs-ensemble-openmeteo-v2.0"
     assert ReasonCode.SUCCESS.value in response.reason_codes
 
 
@@ -124,7 +122,7 @@ def test_agent_feature_unavailable_short_circuits_pipeline():
     mock_weather.get_forecast.return_value = WeatherResult(
         location="Berlin",
         is_available=True,
-        data_version="v1.0",
+        data_version="gfs-ensemble-openmeteo-v2.0",
     )
 
     mock_feature = MagicMock(spec=BaseFeatureService)
@@ -220,11 +218,11 @@ def test_agent_risk_level_thresholds():
     from backend.app.safety.abstention import SafetyEvaluator
 
     evaluator = SafetyEvaluator()
-    assert evaluator._map_risk_level(0.05) == RiskLevel.LOW
-    assert evaluator._map_risk_level(0.19) == RiskLevel.LOW
-    assert evaluator._map_risk_level(0.20) == RiskLevel.MEDIUM
-    assert evaluator._map_risk_level(0.49) == RiskLevel.MEDIUM
-    assert evaluator._map_risk_level(0.50) == RiskLevel.HIGH
-    assert evaluator._map_risk_level(0.74) == RiskLevel.HIGH
-    assert evaluator._map_risk_level(0.75) == RiskLevel.CRITICAL
+    assert evaluator._map_risk_level(0.00) == RiskLevel.LOW
+    assert evaluator._map_risk_level(0.059) == RiskLevel.LOW
+    assert evaluator._map_risk_level(0.060) == RiskLevel.ELEVATED
+    assert evaluator._map_risk_level(0.0996) == RiskLevel.ELEVATED
+    assert evaluator._map_risk_level(0.35) == RiskLevel.ELEVATED
+    assert evaluator._map_risk_level(0.599) == RiskLevel.ELEVATED
+    assert evaluator._map_risk_level(0.600) == RiskLevel.CRITICAL
     assert evaluator._map_risk_level(0.99) == RiskLevel.CRITICAL

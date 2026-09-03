@@ -1,11 +1,18 @@
-"""Real Weather Ingestion Service using Open-Meteo GEFS / GFS public ensemble API."""
+"""Open-Meteo GFS Ensemble ingestion service.
+
+The service preserves actual ensemble members and provider grid provenance.
+It does not infer or fabricate ensemble statistics.
+"""
+
 import json
 import logging
+import re
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Callable, Optional
-from backend.app.data.qc import ForecastQualityControl, QualityControlResult
+
+from backend.app.data.qc import ForecastQualityControl
 from backend.app.schemas.prediction import ReasonCode
 from backend.app.schemas.weather import (
     CanonicalForecastDataset,
@@ -14,6 +21,7 @@ from backend.app.schemas.weather import (
 from backend.app.services.base import BaseWeatherService, WeatherResult
 
 logger = logging.getLogger(__name__)
+
 
 KNOWN_LOCATIONS: dict[str, tuple[float, float]] = {
     "london": (51.5074, -0.1278),
@@ -31,23 +39,29 @@ KNOWN_LOCATIONS: dict[str, tuple[float, float]] = {
 }
 
 
-
 DEFAULT_ENSEMBLE_API_URL = "https://ensemble-api.open-meteo.com/v1/ensemble"
+
+MODEL_NAME = "gfs_seamless"
+SOURCE_NAME = "OPEN_METEO_GFS_ENSEMBLE"
+
+VARIABLE_MAPPING = {
+    "temperature_2m": ("temperature_2m", "celsius"),
+    "surface_pressure": ("surface_pressure", "hPa"),
+    "wind_speed_10m": ("wind_speed_10m", "m/s"),
+    "relative_humidity_2m": ("relative_humidity_2m", "%"),
+    "precipitation": ("precipitation", "mm"),
+}
 
 
 class OpenMeteoGEFSWeatherService(BaseWeatherService):
-    """Production-grade weather ingestion service querying public GFS/GEFS ensemble data.
-
-    Implements BaseWeatherService. Strictly converts raw vendor responses
-    into CanonicalForecastRecord structures and runs rigorous Quality Control.
-    """
+    """Fetch and validate Open-Meteo GFS ensemble forecasts."""
 
     def __init__(
         self,
         api_url: str = DEFAULT_ENSEMBLE_API_URL,
         qc_validator: Optional[ForecastQualityControl] = None,
         http_client: Optional[Callable[[str], dict[str, Any]]] = None,
-        data_version: str = "gefs-openmeteo-v1.0",
+        data_version: str = "gfs-ensemble-openmeteo-v2.0",
         timeout_seconds: int = 10,
     ):
         self.api_url = api_url
@@ -57,34 +71,33 @@ class OpenMeteoGEFSWeatherService(BaseWeatherService):
         self.timeout_seconds = timeout_seconds
 
     def _default_http_client(self, url: str) -> dict[str, Any]:
-        """Perform HTTP GET request using standard library urllib."""
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "Veyra-Forecast-Bust-Sentinel/0.1.0"},
+            headers={"User-Agent": "Veyra-Forecast-Bust-Sentinel/0.2.0"},
         )
         with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
             if response.status != 200:
-                raise RuntimeError(f"HTTP error {response.status} fetching forecast data")
-            payload = response.read().decode("utf-8")
-            return json.loads(payload)
+                raise RuntimeError(f"HTTP error {response.status}")
+            return json.loads(response.read().decode("utf-8"))
 
     def resolve_coordinates(self, location: str) -> Optional[tuple[float, float]]:
-        """Resolve location name or coordinate string to (latitude, longitude)."""
-        loc_clean = location.strip().lower()
-        if loc_clean in KNOWN_LOCATIONS:
-            return KNOWN_LOCATIONS[loc_clean]
+        clean = location.strip().lower()
 
-        # Check if provided as 'lat,lon'
+        if clean in KNOWN_LOCATIONS:
+            return KNOWN_LOCATIONS[clean]
+
         if "," in location:
             parts = location.split(",")
             if len(parts) == 2:
                 try:
                     lat = float(parts[0].strip())
                     lon = float(parts[1].strip())
-                    if -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0:
+
+                    if -90 <= lat <= 90 and -180 <= lon <= 180:
                         return lat, lon
                 except ValueError:
                     pass
+
         return None
 
     def build_query_url(
@@ -93,19 +106,102 @@ class OpenMeteoGEFSWeatherService(BaseWeatherService):
         longitude: float,
         target_date: Optional[str] = None,
     ) -> str:
-        """Construct the Open-Meteo GEFS ensemble query URL."""
         params: dict[str, str] = {
             "latitude": str(latitude),
             "longitude": str(longitude),
-            "hourly": "temperature_2m,surface_pressure,wind_speed_10m,relative_humidity_2m,precipitation",
-            "models": "gfs_seamless",
+            "hourly": ",".join(VARIABLE_MAPPING.keys()),
+            "models": MODEL_NAME,
             "timezone": "UTC",
         }
+
         if target_date:
             params["start_date"] = target_date
             params["end_date"] = target_date
 
         return f"{self.api_url}?{urllib.parse.urlencode(params)}"
+
+    @staticmethod
+    def _iso(value: str) -> str:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return dt.isoformat().replace("+00:00", "Z")
+
+    @staticmethod
+    def _member_keys(hourly: dict[str, Any], variable: str) -> list[str]:
+        """Return actual member fields present in the payload."""
+        pattern = re.compile(rf"^{re.escape(variable)}_member(\d+)$")
+
+        members = []
+
+        for key in hourly:
+            match = pattern.match(key)
+            if match:
+                members.append((int(match.group(1)), key))
+
+        members.sort()
+        return [key for _, key in members]
+
+    @staticmethod
+    def _stats(
+        hourly: dict[str, Any],
+        member_keys: list[str],
+        index: int,
+    ) -> tuple[Optional[int], Optional[float], Optional[float],
+               Optional[float], Optional[float], Optional[float],
+               Optional[float]]:
+        """Calculate statistics from actual ensemble member values."""
+
+        values: list[float] = []
+
+        for key in member_keys:
+            arr = hourly.get(key, [])
+
+            if index >= len(arr):
+                continue
+
+            value = arr[index]
+
+            if value is None:
+                continue
+
+            try:
+                values.append(float(value))
+            except (TypeError, ValueError):
+                continue
+
+        if not values:
+            return None, None, None, None, None, None, None
+
+        values.sort()
+        n = len(values)
+
+        mean = sum(values) / n
+
+        if n > 1:
+            variance = sum((x - mean) ** 2 for x in values) / (n - 1)
+            std = variance ** 0.5
+        else:
+            std = 0.0
+
+        def percentile(p: float) -> float:
+            if n == 1:
+                return values[0]
+
+            position = (n - 1) * p
+            lower = int(position)
+            upper = min(lower + 1, n - 1)
+            fraction = position - lower
+
+            return values[lower] + fraction * (values[upper] - values[lower])
+
+        return (
+            n,
+            mean,
+            std,
+            values[0],
+            values[-1],
+            percentile(0.10),
+            percentile(0.90),
+        )
 
     def parse_canonical_records(
         self,
@@ -114,79 +210,169 @@ class OpenMeteoGEFSWeatherService(BaseWeatherService):
         latitude: float,
         longitude: float,
     ) -> list[CanonicalForecastRecord]:
-        """Parse vendor JSON payload into standardized CanonicalForecastRecords."""
         records: list[CanonicalForecastRecord] = []
+
         hourly = raw_response.get("hourly", {})
-        hourly_units = raw_response.get("hourly_units", {})
         times = hourly.get("time", [])
 
         if not times:
             return []
 
-        # Determine model issue time (first timestamp truncated to day cycle or current cycle)
-        # In Open-Meteo, issue cycle is standard 00Z / 06Z / 12Z / 18Z run
-        first_time = times[0]
+        # Preserve provider-resolved coordinates.
+        provider_lat = raw_response.get("latitude")
+        provider_lon = raw_response.get("longitude")
+
         try:
-            first_dt = datetime.fromisoformat(first_time)
-            issue_dt = first_dt.replace(hour=(first_dt.hour // 6) * 6, minute=0, second=0)
-            issue_time_iso = issue_dt.isoformat() + "Z"
-        except Exception:
-            issue_time_iso = datetime.now(timezone.utc).isoformat()
+            grid_lat = float(provider_lat) if provider_lat is not None else None
+        except (TypeError, ValueError):
+            grid_lat = None
 
-        # Variable mapping: Open-Meteo key -> (canonical name, canonical unit)
-        var_mapping = {
-            "temperature_2m": ("temperature_2m", "celsius"),
-            "surface_pressure": ("surface_pressure", "hPa"),
-            "wind_speed_10m": ("wind_speed_10m", "m/s"),
-            "relative_humidity_2m": ("relative_humidity_2m", "%"),
-            "precipitation": ("precipitation", "mm"),
-        }
+        try:
+            grid_lon = float(provider_lon) if provider_lon is not None else None
+        except (TypeError, ValueError):
+            grid_lon = None
 
-        for i, valid_time_str in enumerate(times):
+        # IMPORTANT:
+        # Do not pretend that the first valid timestamp is a model run.
+        # The seamless endpoint does not give us enough information here to
+        # establish exact historical run provenance.
+        issue_time = None
+
+        # Preserve explicit metadata if provider supplies it.
+        for key in ("model_run", "run_time", "initialization_time", "init_time"):
+            if raw_response.get(key):
+                try:
+                    issue_time = self._iso(str(raw_response[key]))
+                    break
+                except Exception:
+                    pass
+
+        # For live serving only, retain the old operational fallback.
+        # Historical dataset construction must use an exact-run endpoint.
+        if issue_time is None:
+            first_time = str(times[0])
             try:
-                valid_dt = datetime.fromisoformat(valid_time_str)
-                valid_time_iso = valid_dt.isoformat() + "Z"
+                first_dt = datetime.fromisoformat(
+                    first_time.replace("Z", "+00:00")
+                )
+                issue_dt = first_dt.replace(
+                    hour=(first_dt.hour // 6) * 6,
+                    minute=0,
+                    second=0,
+                    microsecond=0,
+                )
+                issue_time = issue_dt.isoformat().replace("+00:00", "Z")
+                inferred_issue = True
             except Exception:
-                valid_time_iso = valid_time_str
+                return []
+        else:
+            inferred_issue = False
 
-            # Strict lead hours calculation
+        for i, valid_time_raw in enumerate(times):
             try:
-                dt_issue = datetime.fromisoformat(issue_time_iso.replace("Z", "+00:00"))
-                dt_valid = datetime.fromisoformat(valid_time_iso.replace("Z", "+00:00"))
-                lead_hours = max(0, int((dt_valid - dt_issue).total_seconds() / 3600))
+                valid_time = self._iso(str(valid_time_raw))
+                dt_issue = datetime.fromisoformat(
+                    issue_time.replace("Z", "+00:00")
+                )
+                dt_valid = datetime.fromisoformat(
+                    valid_time.replace("Z", "+00:00")
+                )
+
+                delta_hours = (
+                    dt_valid - dt_issue
+                ).total_seconds() / 3600.0
+
+                if delta_hours < 0 or delta_hours != int(delta_hours):
+                    continue
+
+                lead_hours = int(delta_hours)
+
             except Exception:
-                lead_hours = i
+                continue
 
-            for src_var, (canon_var, canon_unit) in var_mapping.items():
-                if src_var in hourly:
-                    vals = hourly[src_var]
-                    if i < len(vals):
-                        raw_val = vals[i]
-                        val_float = float(raw_val) if raw_val is not None else None
+            for src_var, (canonical_var, canonical_unit) in VARIABLE_MAPPING.items():
+                values = hourly.get(src_var)
 
-                        record = CanonicalForecastRecord(
-                            location=location,
-                            latitude=latitude,
-                            longitude=longitude,
-                            issue_time=issue_time_iso,
-                            valid_time=valid_time_iso,
-                            lead_hours=lead_hours,
-                            variable=canon_var,
-                            unit=canon_unit,
-                            value=val_float,
-                            source="NOAA_GEFS_OPENMETEO",
-                            member_count=31,  # Standard GEFS member count
-                            ensemble_mean=val_float,
-                        )
-                        records.append(record)
+                if not isinstance(values, list) or i >= len(values):
+                    continue
+
+                raw_value = values[i]
+
+                if raw_value is None:
+                    continue
+
+                try:
+                    control_value = float(raw_value)
+                except (TypeError, ValueError):
+                    continue
+
+                member_keys = self._member_keys(hourly, src_var)
+
+                (
+                    member_count,
+                    ensemble_mean,
+                    ensemble_std,
+                    ensemble_min,
+                    ensemble_max,
+                    q10,
+                    q90,
+                ) = self._stats(hourly, member_keys, i)
+
+                quality_flags = {
+                    "ensemble_members_extracted": member_count is not None,
+                    "ensemble_member_count": member_count,
+                    "issue_time_inferred": inferred_issue,
+                    "provider_grid_coordinates_present": (
+                        grid_lat is not None and grid_lon is not None
+                    ),
+                }
+
+                record = CanonicalForecastRecord(
+                    location=location,
+                    latitude=latitude,
+                    longitude=longitude,
+                    grid_latitude=grid_lat,
+                    grid_longitude=grid_lon,
+                    issue_time=issue_time,
+                    valid_time=valid_time,
+                    lead_hours=lead_hours,
+                    variable=canonical_var,
+                    unit=canonical_unit,
+                    value=control_value,
+                    source=SOURCE_NAME,
+                    model=MODEL_NAME,
+                    model_run=issue_time if not inferred_issue else None,
+                    member_count=member_count,
+                    ensemble_mean=ensemble_mean,
+                    ensemble_std=ensemble_std,
+                    ensemble_min=ensemble_min,
+                    ensemble_max=ensemble_max,
+                    q10=q10,
+                    q90=q90,
+                    quality_flags=quality_flags,
+                    metadata={
+                        "provider": "open-meteo",
+                        "api_model": MODEL_NAME,
+                        "requested_latitude": latitude,
+                        "requested_longitude": longitude,
+                        "provider_grid_latitude": grid_lat,
+                        "provider_grid_longitude": grid_lon,
+                        "data_version": self.data_version,
+                    },
+                )
+
+                records.append(record)
 
         return records
 
     def get_forecast(
-        self, location: str, target_date: Optional[str] = None
+        self,
+        location: str,
+        target_date: Optional[str] = None,
     ) -> WeatherResult:
-        """Fetch live or mocked forecast data, validate QC, and return standardized WeatherResult."""
+
         coords = self.resolve_coordinates(location)
+
         if coords is None:
             return WeatherResult(
                 location=location,
@@ -194,7 +380,7 @@ class OpenMeteoGEFSWeatherService(BaseWeatherService):
                 is_available=False,
                 quality_flags={"qc_passed": False, "invalid_location": True},
                 metadata={"status": ReasonCode.INVALID_LOCATION.value},
-                error=f"Location '{location}' could not be resolved to coordinates",
+                error=f"Location '{location}' could not be resolved",
             )
 
         latitude, longitude = coords
@@ -203,7 +389,7 @@ class OpenMeteoGEFSWeatherService(BaseWeatherService):
         try:
             raw_data = self.http_client(query_url)
         except Exception as exc:
-            logger.error("Failed to query weather API for location '%s': %s", location, exc)
+            logger.error("Weather API failure: %s", exc)
             return WeatherResult(
                 location=location,
                 target_date=target_date,
@@ -213,8 +399,13 @@ class OpenMeteoGEFSWeatherService(BaseWeatherService):
                 error=f"Weather ingestion failed: {exc}",
             )
 
-        # Parse canonical records
-        records = self.parse_canonical_records(raw_data, location, latitude, longitude)
+        records = self.parse_canonical_records(
+            raw_data,
+            location,
+            latitude,
+            longitude,
+        )
+
         if not records:
             return WeatherResult(
                 location=location,
@@ -222,36 +413,60 @@ class OpenMeteoGEFSWeatherService(BaseWeatherService):
                 is_available=False,
                 quality_flags={"qc_passed": False, "empty_records": True},
                 metadata={"status": ReasonCode.DATA_NOT_READY.value},
-                error="Vendor API returned zero parseable time-step records",
+                error="Vendor API returned zero parseable records",
             )
 
-        # Execute Quality Control checks
         qc_result = self.qc.validate_records(records)
+
         if not qc_result.passed:
-            logger.warning("Quality control failed for location '%s': %s", location, qc_result.violations)
             return WeatherResult(
                 location=location,
                 target_date=target_date,
-                raw_data={"record_count": len(records), "sample_records": [r.model_dump() for r in records[:3]]},
+                raw_data={
+                    "record_count": len(records),
+                    "sample_records": [
+                        r.model_dump() for r in records[:3]
+                    ],
+                },
                 data_version=self.data_version,
                 is_available=False,
                 quality_flags=qc_result.flags,
                 metadata={
-                    "status": qc_result.reason_code.value if qc_result.reason_code else ReasonCode.QC_FAILED.value,
+                    "status": (
+                        qc_result.reason_code.value
+                        if qc_result.reason_code
+                        else ReasonCode.QC_FAILED.value
+                    ),
                     "violations": qc_result.violations,
                 },
-                error=f"Quality control checks failed: {'; '.join(qc_result.violations[:3])}",
+                error=(
+                    "Quality control failed: "
+                    + "; ".join(qc_result.violations[:3])
+                ),
             )
 
-        # QC Succeeded
+        first = records[0]
+
         dataset = CanonicalForecastDataset(
             location=location,
             latitude=latitude,
             longitude=longitude,
-            issue_time=records[0].issue_time,
-            source="NOAA_GEFS_OPENMETEO",
+            grid_latitude=first.grid_latitude,
+            grid_longitude=first.grid_longitude,
+            issue_time=first.issue_time,
+            source=SOURCE_NAME,
+            model=MODEL_NAME,
+            model_run=first.model_run,
             records=records,
-            metadata={"record_count": len(records), "data_version": self.data_version},
+            metadata={
+                "record_count": len(records),
+                "data_version": self.data_version,
+                "requested_coordinates": [latitude, longitude],
+                "provider_grid_coordinates": [
+                    first.grid_latitude,
+                    first.grid_longitude,
+                ],
+            },
         )
 
         return WeatherResult(
@@ -264,7 +479,15 @@ class OpenMeteoGEFSWeatherService(BaseWeatherService):
             metadata={
                 "status": ReasonCode.SUCCESS.value,
                 "record_count": len(records),
-                "issue_time": records[0].issue_time,
-                "lead_hours_range": [records[0].lead_hours, records[-1].lead_hours],
+                "issue_time": first.issue_time,
+                "lead_hours_range": [
+                    min(r.lead_hours for r in records),
+                    max(r.lead_hours for r in records),
+                ],
+                "ensemble_members_extracted": first.member_count,
+                "provider_grid_coordinates": [
+                    first.grid_latitude,
+                    first.grid_longitude,
+                ],
             },
         )

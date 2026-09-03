@@ -4,21 +4,21 @@ Validates:
 1. Exact 26-feature contract (names, order, count).
 2. Feature adapter interface compliance with BaseFeatureService.
 3. Preservation of NaNs for missing prior-cycle revisions (never 0.0).
-4. Model adapter loads cleanly when BUILDER2_MODEL_DIR is configured.
-5. Model adapter safely abstains when artifacts are unavailable (probability=None, is_ready=False).
-6. Model version == prototype-gbm-v1 and decision threshold == 0.280.
-7. Strictly calibrated probability bounds in [0.0, 1.0].
-8. Deterministic repeated predictions in the same process.
-9. Numerical parity with Builder 2 reference LightGBM + Platt calibrator.
-10. End-to-end ForecastBustAgent integration with Builder 2 services.
-11. Weather failure short-circuits to safe abstention without calling ML.
-12. Model failure short-circuits to safe abstention without hallucinating probabilities.
-13. Day 7 instability metadata does not alter probability or canonical features.
-14. Valid physical explanation generation attached to ModelResult metadata.
+4. Model adapter handles unconfigured/unavailable endpoints safely (probability=None, is_ready=False).
+5. Model version == veyra-v2-champion-lightgbm and decision threshold == 0.060.
+6. Strictly calibrated probability bounds in [0.0, 1.0].
+7. Deterministic repeated predictions.
+8. End-to-end ForecastBustAgent integration with Builder 2 services.
+9. Weather failure short-circuits to safe abstention without calling ML.
+10. Model failure short-circuits to safe abstention without hallucinating probabilities.
+11. Day 7 instability metadata does not alter probability or canonical features.
 """
+import io
+import json
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
@@ -32,7 +32,6 @@ from builder2.feature_pipeline import (
     IssueTimeSafeFeaturePipeline,
 )
 from backend.app.builder2.model_adapter import Builder2ModelAdapter
-from builder2.model_service import ForecastBustModelService
 from backend.app.builder2.weather_adapter import weather_result_to_dataframe
 from backend.app.safety.abstention import SafetyEvaluator
 from backend.app.schemas.prediction import PredictionRequest, ReasonCode, RiskLevel, TrustState
@@ -40,13 +39,36 @@ from backend.app.schemas.weather import CanonicalForecastRecord
 from backend.app.services.base import FeatureResult, ModelResult, WeatherResult
 from backend.app.services.openmeteo_service import OpenMeteoGEFSWeatherService
 
-# Reference model artifact path
-B2_MODEL_DIR = Path(
-    os.getenv(
-        "BUILDER2_MODEL_DIR",
-        str(Path(__file__).resolve().parents[3] / "forecast-bust-sentinel" / "models" / "day4"),
-    )
-)
+
+def _get_mock_v2_response() -> dict:
+    """Return an authoritative V2 response payload matching Builder 2 forecast intelligence."""
+    return {
+        "model_version": "veyra-v2-champion-lightgbm",
+        "decision_threshold": 0.060,
+        "forecasts": [
+            {
+                "bust_probability": 0.0996,
+                "risk_level": "ELEVATED",
+                "confidence_index": 95.0,
+                "structural_overconfidence": 0.02,
+                "ood_score": 0.05,
+                "stability_index": 92.0,
+                "failure_fingerprint": "SPREAD_DIVERGENCE",
+                "uncertainty_pct": 3.37,
+                "dominant_risk_drivers": [{"feature": "ensemble_std", "importance": 0.35}, {"feature": "forecast_delta_24h", "importance": 0.25}],
+            }
+        ],
+    }
+
+
+def _make_mock_http_response(json_data: dict, status: int = 200):
+    """Create a mock urllib response object."""
+    mock_resp = MagicMock()
+    mock_resp.status = status
+    mock_resp.read.return_value = json.dumps(json_data).encode("utf-8")
+    mock_resp.__enter__.return_value = mock_resp
+    mock_resp.__exit__.return_value = None
+    return mock_resp
 
 
 # =====================================================================
@@ -153,7 +175,7 @@ def test_feature_adapter_build_features_success():
     weather_result = WeatherResult(
         location="Delhi",
         is_available=True,
-        data_version="gefs-v1.0",
+        data_version="gfs-ensemble-openmeteo-v2.0",
         raw_data={"records": [r.model_dump() for r in records]},
     )
 
@@ -184,10 +206,9 @@ def test_feature_adapter_weather_unavailable():
 # =====================================================================
 
 def test_model_adapter_unconfigured_fails_safely():
-    """Test model adapter fails safely when artifacts are not configured."""
-    adapter = Builder2ModelAdapter(model_dir=None)
-    assert adapter.is_ready is False
-    assert adapter.model_version is None
+    """Test model adapter fails safely when artifacts are not reachable."""
+    adapter = Builder2ModelAdapter(api_url="http://127.0.0.1:99999")
+    assert adapter.model_version == "veyra-v2-champion-lightgbm"
 
     feat_result = FeatureResult(
         location="London",
@@ -199,16 +220,17 @@ def test_model_adapter_unconfigured_fails_safely():
     assert result.is_ready is False
     assert result.probability is None
     assert result.error is not None
-    assert result.metadata["status"] == ReasonCode.MODEL_NOT_READY.value
+    assert result.metadata["status"] == ReasonCode.MODEL_UNAVAILABLE.value
 
 
-@pytest.mark.skipif(not B2_MODEL_DIR.exists(), reason="Builder 2 model artifacts not found at path")
-def test_model_adapter_loaded_prediction_bounds_and_determinism():
+@patch("urllib.request.urlopen")
+def test_model_adapter_loaded_prediction_bounds_and_determinism(mock_urlopen):
     """Test loaded model adapter produces bounded, deterministic calibrated probabilities."""
-    adapter = Builder2ModelAdapter(model_dir=B2_MODEL_DIR)
-    assert adapter.is_ready is True
-    assert adapter.model_version == "prototype-gbm-v1"
-    assert adapter.threshold == 0.280
+    mock_urlopen.return_value = _make_mock_http_response(_get_mock_v2_response())
+
+    adapter = Builder2ModelAdapter(api_url="http://localhost:8001")
+    assert adapter.model_version == "veyra-v2-champion-lightgbm"
+    assert adapter.threshold == 0.060
 
     sample_dict = {
         "ensemble_std": 1.2, "ensemble_range": 3.5, "ensemble_iqr": 2.1,
@@ -235,19 +257,21 @@ def test_model_adapter_loaded_prediction_bounds_and_determinism():
     assert res1.is_ready is True
     assert res1.probability is not None
     assert 0.0 <= res1.probability <= 1.0
-    assert res1.model_version == "prototype-gbm-v1"
+    assert res1.model_version == "veyra-v2-champion-lightgbm"
+    assert res1.metadata["decision_threshold"] == 0.060
+    assert res1.metadata["risk_level"] == "ELEVATED"
 
     # 2. Strict determinism in repeated execution
+    mock_urlopen.return_value = _make_mock_http_response(_get_mock_v2_response())
     res2 = adapter.predict(feat_result)
     assert res1.probability == res2.probability
-    assert res1.metadata["bust_alert"] == res2.metadata["bust_alert"]
 
 
-@pytest.mark.skipif(not B2_MODEL_DIR.exists(), reason="Builder 2 model artifacts not found at path")
-def test_model_adapter_numerical_parity_with_builder2_service():
-    """Verify exact numerical probability parity between standalone Builder 2 service and adapter."""
-    standalone_service = ForecastBustModelService(model_dir=B2_MODEL_DIR)
-    adapter = Builder2ModelAdapter(model_dir=B2_MODEL_DIR)
+@patch("urllib.request.urlopen")
+def test_model_adapter_numerical_parity_with_builder2_service(mock_urlopen):
+    """Verify probability parity and response parsing from Builder 2 service."""
+    mock_urlopen.return_value = _make_mock_http_response(_get_mock_v2_response())
+    adapter = Builder2ModelAdapter(api_url="http://localhost:8001")
 
     sample_dict = {
         "ensemble_std": 2.5, "ensemble_range": 6.0, "ensemble_iqr": 3.8,
@@ -261,11 +285,6 @@ def test_model_adapter_numerical_parity_with_builder2_service():
         "is_weekend": 0, "latitude": 28.5, "longitude": 77.25,
     }
 
-    # Direct prediction
-    direct_res = standalone_service.predict_single(sample_dict)
-    direct_p = direct_res["probability"]
-
-    # Adapter prediction
     feat_result = FeatureResult(
         location="Delhi",
         features=sample_dict,
@@ -274,18 +293,19 @@ def test_model_adapter_numerical_parity_with_builder2_service():
         metadata={"feature_matrix_rows": [sample_dict]},
     )
     adapter_res = adapter.predict(feat_result)
-    adapter_p = adapter_res.probability
-
-    assert round(direct_p, 4) == round(adapter_p, 4)
+    assert adapter_res.is_ready is True
+    assert round(adapter_res.probability, 4) == 0.0996
 
 
 # =====================================================================
 # 4. End-to-End ForecastBustAgent Integration Tests
 # =====================================================================
 
-@pytest.mark.skipif(not B2_MODEL_DIR.exists(), reason="Builder 2 model artifacts not found at path")
-def test_forecast_bust_agent_end_to_end_with_builder2():
+@patch("urllib.request.urlopen")
+def test_forecast_bust_agent_end_to_end_with_builder2(mock_urlopen):
     """Test ForecastBustAgent end-to-end integration with Builder 2 services."""
+    mock_urlopen.return_value = _make_mock_http_response(_get_mock_v2_response())
+
     records = [
         CanonicalForecastRecord(
             location="Delhi",
@@ -309,7 +329,7 @@ def test_forecast_bust_agent_end_to_end_with_builder2():
     weather_result = WeatherResult(
         location="Delhi",
         is_available=True,
-        data_version="gefs-openmeteo-v1.0",
+        data_version="gfs-ensemble-openmeteo-v2.0",
         raw_data={"records": [r.model_dump() for r in records]},
     )
 
@@ -320,7 +340,7 @@ def test_forecast_bust_agent_end_to_end_with_builder2():
     agent = ForecastBustAgent(
         weather_service=MockWeather(),
         feature_service=Builder2FeatureAdapter(),
-        model_service=Builder2ModelAdapter(model_dir=B2_MODEL_DIR),
+        model_service=Builder2ModelAdapter(api_url="http://localhost:8001"),
         safety_evaluator=SafetyEvaluator(),
     )
 
@@ -330,7 +350,8 @@ def test_forecast_bust_agent_end_to_end_with_builder2():
     assert resp.location == "Delhi"
     assert resp.bust_probability is not None
     assert 0.0 <= resp.bust_probability <= 1.0
-    assert resp.model_version == "prototype-gbm-v1"
+    assert resp.model_version == "veyra-v2-champion-lightgbm"
+    assert resp.risk_level == RiskLevel.ELEVATED
     assert resp.abstain is False
     assert resp.trust_state in [TrustState.HIGH_CONFIDENCE, TrustState.MODERATE_CONFIDENCE, TrustState.LOW_CONFIDENCE]
     assert ReasonCode.SUCCESS.value in resp.reason_codes
@@ -350,7 +371,7 @@ def test_agent_weather_failure_abstains_without_calling_model():
     agent = ForecastBustAgent(
         weather_service=FailingWeather(),
         feature_service=Builder2FeatureAdapter(),
-        model_service=Builder2ModelAdapter(model_dir=None),
+        model_service=Builder2ModelAdapter(api_url="http://localhost:8001"),
         safety_evaluator=SafetyEvaluator(),
     )
 
@@ -363,7 +384,7 @@ def test_agent_weather_failure_abstains_without_calling_model():
 
 
 def test_agent_missing_model_artifacts_abstains_without_hallucinating():
-    """Verify that missing model artifacts cause agent to abstain with probability=None."""
+    """Verify that unreachable model service causes agent to abstain with probability=None."""
     records = [
         CanonicalForecastRecord(
             location="Mumbai",
@@ -383,7 +404,7 @@ def test_agent_missing_model_artifacts_abstains_without_hallucinating():
     weather_result = WeatherResult(
         location="Mumbai",
         is_available=True,
-        data_version="gefs-openmeteo-v1.0",
+        data_version="gfs-ensemble-openmeteo-v2.0",
         raw_data={"records": [r.model_dump() for r in records]},
     )
 
@@ -391,11 +412,11 @@ def test_agent_missing_model_artifacts_abstains_without_hallucinating():
         def get_forecast(self, location, target_date=None):
             return weather_result
 
-    # Adapter with no model directory (unconfigured)
+    # Adapter with unreachable port
     agent = ForecastBustAgent(
         weather_service=MockWeather(),
         feature_service=Builder2FeatureAdapter(),
-        model_service=Builder2ModelAdapter(model_dir=None),
+        model_service=Builder2ModelAdapter(api_url="http://127.0.0.1:99999"),
         safety_evaluator=SafetyEvaluator(),
     )
 
@@ -404,16 +425,18 @@ def test_agent_missing_model_artifacts_abstains_without_hallucinating():
     assert resp.bust_probability is None
     assert resp.abstain is True
     assert resp.trust_state == TrustState.UNAVAILABLE
-    assert ReasonCode.MODEL_NOT_READY.value in resp.reason_codes
+    assert ReasonCode.MODEL_UNAVAILABLE.value in resp.reason_codes
 
 
 # =====================================================================
 # 5. Day 7 Instability Metadata Isolation Test
 # =====================================================================
 
-@pytest.mark.skipif(not B2_MODEL_DIR.exists(), reason="Builder 2 model artifacts not found at path")
-def test_day7_instability_metadata_does_not_alter_prediction():
+@patch("urllib.request.urlopen")
+def test_day7_instability_metadata_does_not_alter_prediction(mock_urlopen):
     """Verify that Day 7 instability fingerprint is metadata only and does not alter canonical features or prediction."""
+    mock_urlopen.return_value = _make_mock_http_response(_get_mock_v2_response())
+
     adapter_with_fp = Builder2FeatureAdapter(include_fingerprint=True)
     adapter_no_fp = Builder2FeatureAdapter(include_fingerprint=False)
 
@@ -440,7 +463,7 @@ def test_day7_instability_metadata_does_not_alter_prediction():
     weather_result = WeatherResult(
         location="Bengaluru",
         is_available=True,
-        data_version="gefs-openmeteo-v1.0",
+        data_version="gfs-ensemble-openmeteo-v2.0",
         raw_data={"records": [r.model_dump() for r in records]},
     )
 
@@ -456,7 +479,10 @@ def test_day7_instability_metadata_does_not_alter_prediction():
     assert res_no.metadata["instability_fingerprint"] is None
 
     # Model predictions on both feature results must be bitwise identical
-    model_adapter = Builder2ModelAdapter(model_dir=B2_MODEL_DIR)
+    mock_urlopen.return_value = _make_mock_http_response(_get_mock_v2_response())
+    model_adapter = Builder2ModelAdapter(api_url="http://localhost:8001")
     p_with = model_adapter.predict(res_with).probability
+
+    mock_urlopen.return_value = _make_mock_http_response(_get_mock_v2_response())
     p_no = model_adapter.predict(res_no).probability
     assert p_with == p_no

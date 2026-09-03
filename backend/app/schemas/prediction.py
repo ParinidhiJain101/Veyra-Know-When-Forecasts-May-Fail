@@ -1,6 +1,6 @@
 """Prediction request and response schemas."""
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -18,6 +18,7 @@ class RiskLevel(str, Enum):
     """Categorical risk level of forecast bust."""
 
     LOW = "LOW"
+    ELEVATED = "ELEVATED"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
     CRITICAL = "CRITICAL"
@@ -48,7 +49,7 @@ class PredictionRequest(BaseModel):
         ...,
         min_length=1,
         description="Location name, city, or coordinates for forecast evaluation",
-        examples=["London", "Tokyo", "New York"],
+        examples=["Delhi", "Mumbai", "Kolkata"],
     )
     target_date: Optional[str] = Field(
         default=None,
@@ -67,7 +68,7 @@ class PredictionRequest(BaseModel):
 
 
 class PredictionResponse(BaseModel):
-    """Forecast bust prediction response payload."""
+    """Authoritative Forecast Bust Prediction Response payload with full V2 Intelligence."""
 
     location: str = Field(
         ...,
@@ -77,15 +78,57 @@ class PredictionResponse(BaseModel):
         default=None,
         ge=0.0,
         le=1.0,
-        description="Estimated probability (0.0 - 1.0) of forecast bust. null when unavailable or abstained.",
+        description="Calibrated probability (0.0 - 1.0) of forecast bust. null when unavailable or abstained.",
     )
     risk_level: Optional[RiskLevel] = Field(
         default=None,
-        description="Categorical risk level for forecast failure",
+        description="Categorical operational risk level (LOW < 0.060, ELEVATED >= 0.060, CRITICAL >= 0.600)",
     )
     trust_state: TrustState = Field(
         default=TrustState.UNAVAILABLE,
         description="Assessment of model reliability for this forecast instance",
+    )
+    confidence_index: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=100.0,
+        description="Non-probabilistic heuristic forecast reliability index (0-100)",
+    )
+    uncertainty_pct: Optional[float] = Field(
+        default=None,
+        description="Prediction uncertainty error margin (+/- %)",
+    )
+    ood_distance: Optional[float] = Field(
+        default=None,
+        description="Out-of-Distribution Mahalanobis novelty distance score",
+    )
+    revision: Optional[float] = Field(
+        default=None,
+        description="Cycle-over-cycle forecast trajectory revision magnitude",
+    )
+    stability: Optional[float] = Field(
+        default=None,
+        description="Forecast trajectory stability index (0-100)",
+    )
+    structural_overconfidence: Optional[float] = Field(
+        default=None,
+        description="Structural overconfidence physical signal score",
+    )
+    failure_fingerprint: Optional[str] = Field(
+        default=None,
+        description="Analytical failure archetype classification (e.g., STABLE_SYNOPTIC_CONSENSUS, ENSEMBLE_BIFURCATION)",
+    )
+    dominant_risk_drivers: Optional[list[dict[str, Any]]] = Field(
+        default=None,
+        description="List of primary physical risk drivers contributing to bust probability",
+    )
+    model_version: Optional[str] = Field(
+        default=None,
+        description="Identifier of the ML model used (e.g., veyra-v2-champion-lightgbm)",
+    )
+    data_version: Optional[str] = Field(
+        default=None,
+        description="Identifier of the weather data pipeline version used",
     )
     abstain: bool = Field(
         default=True,
@@ -95,26 +138,26 @@ class PredictionResponse(BaseModel):
         default_factory=lambda: [ReasonCode.MODEL_NOT_READY.value],
         description="List of reason codes explaining the prediction or abstention decision",
     )
-    model_version: Optional[str] = Field(
-        default=None,
-        description="Identifier of the ML model used, if available",
-    )
-    data_version: Optional[str] = Field(
-        default=None,
-        description="Identifier of the weather data pipeline version used, if available",
-    )
 
     model_config = {
         "json_schema_extra": {
             "example": {
-                "location": "London",
-                "bust_probability": None,
-                "risk_level": None,
-                "trust_state": "UNAVAILABLE",
-                "abstain": True,
-                "reason_codes": ["MODEL_NOT_READY"],
-                "model_version": None,
-                "data_version": None,
+                "location": "Delhi",
+                "bust_probability": 0.0996,
+                "risk_level": "ELEVATED",
+                "trust_state": "HIGH_CONFIDENCE",
+                "confidence_index": 90.0,
+                "uncertainty_pct": 3.37,
+                "ood_distance": 0.0,
+                "revision": None,
+                "stability": 100.0,
+                "structural_overconfidence": 0.0,
+                "failure_fingerprint": "STABLE_SYNOPTIC_CONSENSUS",
+                "dominant_risk_drivers": [],
+                "model_version": "veyra-v2-champion-lightgbm",
+                "data_version": "gefs-openmeteo-v1.0",
+                "abstain": False,
+                "reason_codes": ["SUCCESS"],
             }
         }
     }

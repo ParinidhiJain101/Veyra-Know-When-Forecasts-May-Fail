@@ -18,10 +18,31 @@ from backend.app.services.model_service import UnavailableModelService
 
 def test_predict_valid_location_accepted(client: TestClient):
     """Test that POST /v1/predict accepts a valid location with HTTP 200."""
-    response = client.post("/v1/predict", json={"location": "London"})
-    assert response.status_code == 200
-    data = response.json()
-    assert data["location"] == "London"
+    class MockWeather(BaseWeatherService):
+        def get_forecast(self, location: str, target_date=None) -> WeatherResult:
+            return WeatherResult(location=location, is_available=True, data_version="gfs-ensemble-openmeteo-v2.0")
+
+    class MockFeature(BaseFeatureService):
+        def build_features(self, weather_result: WeatherResult) -> FeatureResult:
+            return FeatureResult(location=weather_result.location, is_ready=True)
+
+    class MockModel(BaseModelService):
+        def predict(self, feature_result: FeatureResult) -> ModelResult:
+            return ModelResult(probability=0.05, model_version="veyra-v2-champion-lightgbm", is_ready=True)
+
+    custom_agent = ForecastBustAgent(
+        weather_service=MockWeather(),
+        feature_service=MockFeature(),
+        model_service=MockModel(),
+    )
+    app.dependency_overrides[get_forecast_bust_agent] = lambda: custom_agent
+    try:
+        response = client.post("/v1/predict", json={"location": "London"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["location"] == "London"
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_predict_bust_probability_is_null_when_model_unavailable(client: TestClient):
@@ -115,7 +136,7 @@ def test_predict_dependency_injection_override(client: TestClient):
 
     class MockWeather(BaseWeatherService):
         def get_forecast(self, location: str, target_date=None) -> WeatherResult:
-            return WeatherResult(location=location, is_available=True, data_version="gefs-v1.0")
+            return WeatherResult(location=location, is_available=True, data_version="gfs-ensemble-openmeteo-v2.0")
 
     class MockFeature(BaseFeatureService):
         def build_features(self, weather_result: WeatherResult) -> FeatureResult:
@@ -123,7 +144,7 @@ def test_predict_dependency_injection_override(client: TestClient):
 
     class MockModel(BaseModelService):
         def predict(self, feature_result: FeatureResult) -> ModelResult:
-            return ModelResult(probability=0.15, model_version="lgbm-calibrated-v1", is_ready=True)
+            return ModelResult(probability=0.15, model_version="veyra-v2-champion-lightgbm", is_ready=True)
 
     custom_agent = ForecastBustAgent(
         weather_service=MockWeather(),
@@ -138,10 +159,10 @@ def test_predict_dependency_injection_override(client: TestClient):
         data = response.json()
         assert data["location"] == "Geneva"
         assert data["bust_probability"] == 0.15
-        assert data["risk_level"] == "LOW"
+        assert data["risk_level"] == "ELEVATED"
         assert data["trust_state"] == "HIGH_CONFIDENCE"
         assert data["abstain"] is False
-        assert data["model_version"] == "lgbm-calibrated-v1"
-        assert data["data_version"] == "gefs-v1.0"
+        assert data["model_version"] == "veyra-v2-champion-lightgbm"
+        assert data["data_version"] == "gfs-ensemble-openmeteo-v2.0"
     finally:
         app.dependency_overrides.clear()

@@ -78,7 +78,7 @@ def test_openmeteo_service_canonical_parsing():
     assert first_record.variable == "temperature_2m"
     assert first_record.unit == "celsius"
     assert first_record.value == 15.2
-    assert first_record.member_count == 31
+    assert first_record.member_count is None
 
 
 def test_openmeteo_service_get_forecast_offline():
@@ -90,7 +90,7 @@ def test_openmeteo_service_get_forecast_offline():
     assert isinstance(result, WeatherResult)
     assert result.is_available is True
     assert result.quality_flags["qc_passed"] is True
-    assert result.data_version == "gefs-openmeteo-v1.0"
+    assert result.data_version == "gfs-ensemble-openmeteo-v2.0"
     assert result.metadata["record_count"] == 20
     mock_http.assert_called_once()
 
@@ -121,7 +121,7 @@ def test_agent_integration_with_real_weather_service():
     assert response.risk_level is None
     assert response.trust_state == TrustState.UNAVAILABLE
     assert response.abstain is True
-    assert response.data_version == "gefs-openmeteo-v1.0"
+    assert response.data_version == "gfs-ensemble-openmeteo-v2.0"
 
 
 def test_historical_pathway_error_and_bust_labeling():
