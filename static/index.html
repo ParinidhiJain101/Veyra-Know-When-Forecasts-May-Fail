@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Forecast-Bust Sentinel — Operational weather forecast risk monitoring dashboard">
+    <title>Forecast-Bust Sentinel — Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ================================================================
+           Design System — Forecast-Bust Sentinel
+           ================================================================ */
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-card: #1a2036;
+            --bg-card-hover: #212942;
+            --bg-glass: rgba(26, 32, 54, 0.7);
+            --border: rgba(99, 128, 255, 0.12);
+            --border-active: rgba(99, 128, 255, 0.35);
+            --text-primary: #e8ecf4;
+            --text-secondary: #8b95b0;
+            --text-muted: #5a6480;
+            --accent-blue: #6380ff;
+            --accent-cyan: #22d3ee;
+            --accent-green: #34d399;
+            --accent-amber: #fbbf24;
+            --accent-red: #f87171;
+            --accent-purple: #a78bfa;
+            --gradient-brand: linear-gradient(135deg, #6380ff 0%, #22d3ee 100%);
+            --gradient-danger: linear-gradient(135deg, #f87171 0%, #fbbf24 100%);
+            --gradient-success: linear-gradient(135deg, #34d399 0%, #22d3ee 100%);
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+            --shadow-glow: 0 0 40px rgba(99, 128, 255, 0.08);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 24px;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Cascadia Code', monospace;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Animated background mesh */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 600px 400px at 15% 20%, rgba(99, 128, 255, 0.06) 0%, transparent 70%),
+                radial-gradient(ellipse 500px 350px at 85% 75%, rgba(34, 211, 238, 0.04) 0%, transparent 70%),
+                radial-gradient(ellipse 400px 300px at 50% 50%, rgba(167, 139, 250, 0.03) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ================================================================
+           Layout
+           ================================================================ */
+        .app-container {
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px 32px 60px;
+        }
+
+        /* ================================================================
+           Header
+           ================================================================ */
+        .app-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 0 28px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 32px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-icon {
+            width: 44px;
+            height: 44px;
+            background: var(--gradient-brand);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 0 24px rgba(99, 128, 255, 0.25);
+            animation: pulse-glow 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 24px rgba(99, 128, 255, 0.25); }
+            50%       { box-shadow: 0 0 36px rgba(99, 128, 255, 0.4); }
+        }
+
+        .brand h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+            background: var(--gradient-brand);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .brand-subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 400;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .header-status {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 100px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+        }
+
+        .status-pill.online .status-dot {
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+
+        .status-pill.offline .status-dot {
+            background: var(--accent-red);
+            box-shadow: 0 0 8px var(--accent-red);
+        }
+
+        .status-pill.loading .status-dot {
+            background: var(--accent-amber);
+            box-shadow: 0 0 8px var(--accent-amber);
+            animation: blink 1s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0.3; }
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .refresh-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 18px;
+            border-radius: 100px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--accent-blue);
+            font-family: var(--font-sans);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .refresh-btn:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-active);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .refresh-btn:active { transform: translateY(0); }
+
+        .refresh-btn svg {
+            width: 14px;
+            height: 14px;
+            transition: transform 0.5s ease;
+        }
+
+        .refresh-btn.spinning svg {
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ================================================================
+           Stat Cards
+           ================================================================ */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 22px 24px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        }
+
+        .stat-card:nth-child(1)::before { background: var(--gradient-brand); }
+        .stat-card:nth-child(2)::before { background: var(--gradient-success); }
+        .stat-card:nth-child(3)::before { background: var(--gradient-danger); }
+        .stat-card:nth-child(4)::before { background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan)); }
+
+        .stat-card:hover {
+            border-color: var(--border-active);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            line-height: 1.1;
+        }
+
+        .stat-value.blue   { color: var(--accent-blue); }
+        .stat-value.green  { color: var(--accent-green); }
+        .stat-value.amber  { color: var(--accent-amber); }
+        .stat-value.red    { color: var(--accent-red); }
+        .stat-value.purple { color: var(--accent-purple); }
+
+        .stat-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+            font-family: var(--font-mono);
+        }
+
+        /* ================================================================
+           Section Panels
+           ================================================================ */
+        .panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            margin-bottom: 24px;
+            overflow: hidden;
+            transition: border-color 0.3s ease;
+        }
+
+        .panel:hover { border-color: var(--border-active); }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(99, 128, 255, 0.02);
+        }
+
+        .panel-title {
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 100px;
+            background: rgba(99, 128, 255, 0.12);
+            color: var(--accent-blue);
+        }
+
+        .panel-body { padding: 20px 24px; }
+
+        /* ================================================================
+           Locations Table
+           ================================================================ */
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .data-table th {
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table td {
+            padding: 14px 16px;
+            font-size: 14px;
+            border-bottom: 1px solid rgba(99, 128, 255, 0.06);
+            transition: background 0.2s ease;
+        }
+
+        .data-table tbody tr:hover td {
+            background: rgba(99, 128, 255, 0.04);
+        }
+
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .location-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .location-coords {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .location-region {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        /* ================================================================
+           Health / Provenance Info
+           ================================================================ */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 14px;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            background: rgba(99, 128, 255, 0.03);
+            border: 1px solid rgba(99, 128, 255, 0.06);
+        }
+
+        .info-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .info-value {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            word-break: break-all;
+        }
+
+        /* ================================================================
+           Error / Empty States
+           ================================================================ */
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.4;
+        }
+
+        .empty-state-text {
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        .empty-state-sub {
+            font-size: 13px;
+            margin-top: 6px;
+            color: var(--text-muted);
+        }
+
+        .error-banner {
+            padding: 14px 20px;
+            border-radius: var(--radius-md);
+            background: rgba(248, 113, 113, 0.08);
+            border: 1px solid rgba(248, 113, 113, 0.2);
+            color: var(--accent-red);
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error-banner.visible { display: block; }
+
+        /* ================================================================
+           Loading skeleton
+           ================================================================ */
+        .skeleton {
+            background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card-hover) 50%, var(--bg-card) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: var(--radius-sm);
+        }
+
+        @keyframes shimmer {
+            0%   { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .skeleton-line {
+            height: 16px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .skeleton-line:last-child { width: 60%; }
+
+        /* ================================================================
+           Footer
+           ================================================================ */
+        .app-footer {
+            text-align: center;
+            padding: 24px 0;
+            border-top: 1px solid var(--border);
+            margin-top: 16px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .app-footer a {
+            color: var(--accent-blue);
+            text-decoration: none;
+        }
+
+        /* ================================================================
+           Responsive
+           ================================================================ */
+        @media (max-width: 768px) {
+            .app-container { padding: 16px; }
+            .app-header { flex-direction: column; gap: 14px; align-items: flex-start; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .info-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 480px) {
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ================================================================
+           Animations
+           ================================================================ */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-in {
+            animation: fadeInUp 0.4s ease forwards;
+        }
+
+        .animate-in:nth-child(1) { animation-delay: 0.0s; }
+        .animate-in:nth-child(2) { animation-delay: 0.08s; }
+        .animate-in:nth-child(3) { animation-delay: 0.16s; }
+        .animate-in:nth-child(4) { animation-delay: 0.24s; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="brand-icon">⚡</div>
+                <div>
+                    <h1>Forecast-Bust Sentinel</h1>
+                    <div class="brand-subtitle">Operational Risk Monitoring Dashboard</div>
+                </div>
+            </div>
+            <div class="header-status">
+                <div id="statusPill" class="status-pill loading">
+                    <span class="status-dot"></span>
+                    <span id="statusText">Connecting…</span>
+                </div>
+                <button id="refreshBtn" class="refresh-btn" onclick="refreshAll()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+        </header>
+
+        <!-- Error Banner -->
+        <div id="errorBanner" class="error-banner">
+            <span id="errorText"></span>
+        </div>
+
+        <!-- Stat Cards -->
+        <section class="stats-grid" id="statsGrid">
+            <div class="stat-card animate-in">
+                <div class="stat-label">Service Status</div>
+                <div class="stat-value blue" id="statStatus">—</div>
+                <div class="stat-meta" id="statTimestamp">—</div>
+            </div>
+            <div class="stat-card animate-in">
+                <div class="stat-label">Monitored Locations</div>
+                <div class="stat-value green" id="statLocations">—</div>
+                <div class="stat-meta">Registered stations</div>
+            </div>
+            <div class="stat-card animate-in">
+                <div class="stat-label">Decision Threshold</div>
+                <div class="stat-value amber" id="statThreshold">—</div>
+                <div class="stat-meta">Bust probability cutoff</div>
+            </div>
+            <div class="stat-card animate-in">
+                <div class="stat-label">Model Features</div>
+                <div class="stat-value purple" id="statFeatures">—</div>
+                <div class="stat-meta" id="statModelVersion">—</div>
+            </div>
+        </section>
+
+        <!-- Health Panel -->
+        <section class="panel animate-in" id="healthPanel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    🏥 System Health & Provenance
+                    <span class="panel-badge" id="healthBadge">—</span>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div class="info-grid" id="healthGrid">
+                    <div class="empty-state">
+                        <div class="skeleton skeleton-line" style="width:80%"></div>
+                        <div class="skeleton skeleton-line" style="width:60%"></div>
+                        <div class="skeleton skeleton-line" style="width:70%"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Locations Panel -->
+        <section class="panel animate-in" id="locationsPanel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    📍 Monitoring Locations
+                    <span class="panel-badge" id="locationsBadge">—</span>
+                </div>
+            </div>
+            <div class="panel-body" style="padding:0;">
+                <div id="locationsContent">
+                    <div class="empty-state">
+                        <div class="skeleton skeleton-line" style="width:90%; margin:20px auto 0"></div>
+                        <div class="skeleton skeleton-line" style="width:80%; margin:0 auto"></div>
+                        <div class="skeleton skeleton-line" style="width:70%; margin:0 auto 20px"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            Forecast-Bust Sentinel &middot; Operational Risk Platform &middot;
+            Running on <strong>localhost:8001</strong>
+        </footer>
+    </div>
+
+    <script>
+        // ================================================================
+        //  API Client
+        // ================================================================
+        const BASE = '';  // Same-origin
+
+        async function fetchJSON(path) {
+            const res = await fetch(`${BASE}${path}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            return res.json();
+        }
+
+        function setStatus(state, text) {
+            const pill = document.getElementById('statusPill');
+            const span = document.getElementById('statusText');
+            pill.className = `status-pill ${state}`;
+            span.textContent = text;
+        }
+
+        function showError(msg) {
+            const banner = document.getElementById('errorBanner');
+            document.getElementById('errorText').textContent = msg;
+            banner.classList.add('visible');
+        }
+
+        function clearError() {
+            document.getElementById('errorBanner').classList.remove('visible');
+        }
+
+        // ================================================================
+        //  Health
+        // ================================================================
+        async function loadHealth() {
+            try {
+                const data = await fetchJSON('/api/health');
+
+                document.getElementById('statStatus').textContent = data.status?.toUpperCase() || '—';
+                document.getElementById('statThreshold').textContent = data.decision_threshold ?? '—';
+                document.getElementById('statFeatures').textContent = data.feature_count ?? '—';
+                document.getElementById('statModelVersion').textContent = data.model_version ?? '—';
+                document.getElementById('statTimestamp').textContent = data.timestamp_utc
+                    ? new Date(data.timestamp_utc).toLocaleString()
+                    : '—';
+
+                document.getElementById('healthBadge').textContent = data.status?.toUpperCase() || '—';
+
+                // Populate health info grid
+                const grid = document.getElementById('healthGrid');
+                const items = [
+                    ['Service', data.service || '—'],
+                    ['Model Version', data.model_version || '—'],
+                    ['Decision Threshold', data.decision_threshold ?? '—'],
+                    ['Feature Count', data.feature_count ?? '—'],
+                    ['Timestamp (UTC)', data.timestamp_utc ? new Date(data.timestamp_utc).toLocaleString() : '—'],
+                ];
+                grid.innerHTML = items.map(([label, value]) => `
+                    <div class="info-item">
+                        <span class="info-label">${label}</span>
+                        <span class="info-value">${value}</span>
+                    </div>
+                `).join('');
+
+                setStatus('online', 'System Online');
+                clearError();
+            } catch (err) {
+                setStatus('offline', 'Offline');
+                showError(`Health check failed: ${err.message}`);
+            }
+        }
+
+        // ================================================================
+        //  Locations
+        // ================================================================
+        async function loadLocations() {
+            try {
+                const data = await fetchJSON('/api/locations');
+                const count = data.count ?? 0;
+                const locations = data.locations ?? [];
+
+                document.getElementById('statLocations').textContent = count;
+                document.getElementById('locationsBadge').textContent = `${count} stations`;
+
+                const container = document.getElementById('locationsContent');
+
+                if (locations.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📡</div>
+                            <div class="empty-state-text">No locations registered</div>
+                            <div class="empty-state-sub">Configure locations in the API to begin monitoring.</div>
+                        </div>`;
+                    return;
+                }
+
+                // Build table
+                const rows = locations.map(loc => {
+                    const id = loc.location_id || '—';
+                    const city = loc.city || '—';
+                    const region = loc.state_region || '—';
+                    const country = loc.country || '—';
+                    const lat = loc.requested_coordinates?.latitude ?? '—';
+                    const lon = loc.requested_coordinates?.longitude ?? '—';
+                    return `
+                        <tr>
+                            <td><span class="location-name">${city}</span></td>
+                            <td><code style="color:var(--accent-cyan);font-family:var(--font-mono);font-size:12px">${id}</code></td>
+                            <td class="location-region">${region}, ${country}</td>
+                            <td class="location-coords">${lat}°N, ${lon}°E</td>
+                        </tr>`;
+                }).join('');
+
+                container.innerHTML = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>City</th>
+                                <th>Location ID</th>
+                                <th>Region</th>
+                                <th>Coordinates</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>`;
+            } catch (err) {
+                document.getElementById('locationsContent').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <div class="empty-state-text">Failed to load locations</div>
+                        <div class="empty-state-sub">${err.message}</div>
+                    </div>`;
+            }
+        }
+
+        // ================================================================
+        //  Refresh All
+        // ================================================================
+        async function refreshAll() {
+            const btn = document.getElementById('refreshBtn');
+            btn.classList.add('spinning');
+            setStatus('loading', 'Refreshing…');
+
+            await Promise.allSettled([loadHealth(), loadLocations()]);
+
+            btn.classList.remove('spinning');
+        }
+
+        // ================================================================
+        //  Init
+        // ================================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshAll();
+            // Auto-refresh every 60 seconds
+            setInterval(refreshAll, 60000);
+        });
+    </script>
+</body>
+</html>

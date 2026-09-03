@@ -347,9 +347,89 @@ class LocationRegistry:
             "rationale": "Southwest monsoon onset gateway with high year-round relative humidity and heavy rainfall.",
         },
     }
+    
+    EXTENDED_LOCATIONS: Dict[str, Dict[str, Any]] = {
+        "patna": {
+            "location_id": "patna",
+            "country": "India",
+            "state_region": "Bihar",
+            "city": "Patna",
+            "requested_latitude": 25.5941,
+            "requested_longitude": 85.1376,
+            "verified_grid_latitude": None,
+            "verified_grid_longitude": None,
+            "climate_zone": "Cwa",
+            "meteorological_regime": "Eastern Gangetic Floodplain",
+            "elevation_m": 53.0,
+            "is_benchmark": False,
+            "rationale": "Deep alluvial floodplains subject to intense monsoon depressions and severe summer heatwaves.",
+        },
+        "shimla": {
+            "location_id": "shimla",
+            "country": "India",
+            "state_region": "Himachal Pradesh",
+            "city": "Shimla",
+            "requested_latitude": 31.1048,
+            "requested_longitude": 77.1734,
+            "verified_grid_latitude": None,
+            "verified_grid_longitude": None,
+            "climate_zone": "Cwb",
+            "meteorological_regime": "Outer Himalayan Ridge",
+            "elevation_m": 2276.0,
+            "is_benchmark": False,
+            "rationale": "High-altitude Himalayan ridge subject to severe orographic precipitation and winter snowstorms.",
+        },
+        "thiruvananthapuram": {
+            "location_id": "thiruvananthapuram",
+            "country": "India",
+            "state_region": "Kerala",
+            "city": "Thiruvananthapuram",
+            "requested_latitude": 8.5241,
+            "requested_longitude": 76.9366,
+            "verified_grid_latitude": None,
+            "verified_grid_longitude": None,
+            "climate_zone": "Am",
+            "meteorological_regime": "Southern Arabian Sea Coastal Margin",
+            "elevation_m": 16.0,
+            "is_benchmark": False,
+            "rationale": "Extreme southern peninsular tip with bi-modal monsoon patterns and strong marine influence.",
+        },
+        "visakhapatnam": {
+            "location_id": "visakhapatnam",
+            "country": "India",
+            "state_region": "Andhra Pradesh",
+            "city": "Visakhapatnam",
+            "requested_latitude": 17.6868,
+            "requested_longitude": 83.2185,
+            "verified_grid_latitude": None,
+            "verified_grid_longitude": None,
+            "climate_zone": "Aw",
+            "meteorological_regime": "East Coast Maritime / Eastern Ghats Foothill",
+            "elevation_m": 45.0,
+            "is_benchmark": False,
+            "rationale": "Bay of Bengal cyclone-vulnerable coastal city framed by abrupt coastal hills.",
+        },
+        "indore": {
+            "location_id": "indore",
+            "country": "India",
+            "state_region": "Madhya Pradesh",
+            "city": "Indore",
+            "requested_latitude": 22.7196,
+            "requested_longitude": 75.8577,
+            "verified_grid_latitude": None,
+            "verified_grid_longitude": None,
+            "climate_zone": "Aw/BSh",
+            "meteorological_regime": "Western Malwa Plateau",
+            "elevation_m": 553.0,
+            "is_benchmark": False,
+            "rationale": "Inland elevated plateau with strong diurnal temperature range and seasonal monsoon rainfall.",
+        },
+    }
 
-    def __init__(self, custom_locations: Optional[Dict[str, Dict[str, Any]]] = None):
+    def __init__(self, custom_locations: Optional[Dict[str, Dict[str, Any]]] = None, include_extended: bool = False):
         self._locations = dict(self.DEFAULT_LOCATIONS)
+        if include_extended:
+            self._locations.update(self.EXTENDED_LOCATIONS)
         if custom_locations:
             self._locations.update(custom_locations)
 

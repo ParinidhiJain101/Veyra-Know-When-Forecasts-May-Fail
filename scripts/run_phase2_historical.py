@@ -3,7 +3,7 @@ Historical Forecast/Reference Alignment & Error Engine Runner.
 
 Executes end-to-end:
 1. Ingest Genuine Historical GEFS Forecasts (Delhi) from NOAA AWS S3 via ecCodes byte-range extraction
-2. Ingest Historical ERA5 Reanalysis Ground Truth for matching valid times
+2. Ingest Historical ERA5 Reanalysis Verification Reference for matching valid times
 3. Align by Location, Variable, and Valid Time under Spatial Colocation Policy
 4. Compute Forecast Error, Absolute Error, and Ensemble Mean Errors
 5. Persist Paired Historical Dataset to data/historical/delhi/
@@ -29,8 +29,8 @@ def run_historical_alignment(
     location_name: str = "delhi",
     latitude: float = 28.6139,
     longitude: float = 77.2090,
-    start_date: str = "2026-08-18",
-    end_date: str = "2026-08-24",
+    start_date: str = "2017-03-14",
+    end_date: str = "2017-03-16",
     cycle: str = "00",
     horizon_hours: int = 72,
     step_hours: int = 3,
@@ -41,8 +41,8 @@ def run_historical_alignment(
     print("=" * 80)
     print(f"Target Location  : {location_name.upper()} (Lat: {latitude:.4f}, Lon: {longitude:.4f})")
     print(f"Historical Window: {start_date} to {end_date} (00z cycle, 0-{horizon_hours}h at {step_hours}h steps)")
-    print(f"Forecast Model   : NOAA GEFS 0.50 deg Ensemble (31 members, AWS S3 Open Data)")
-    print(f"Truth Reference  : ECMWF ERA5 Reanalysis (Open-Meteo Historical Archive)")
+    print(f"Forecast Model   : NOAA GEFSv12 reforecast (00Z; 5 members normally, 11 on weekly extended runs)")
+    print(f"Truth Reference  : ERA5 reanalysis verification reference (Open-Meteo Historical Archive)")
     print("-" * 80)
 
     # 1. Ingest Genuine Historical GEFS Forecasts from NOAA AWS S3
@@ -68,16 +68,13 @@ def run_historical_alignment(
         print(f"[ERROR] Failed to ingest historical GEFS data from NOAA S3: {e}", file=sys.stderr)
         return 1
 
-    # 2. Ingest Historical ERA5 Truth Reference
-    # Bound ERA5 historical query by latest available date (typically yesterday / 2026-08-25)
+    # 2. Ingest ERA5 verification reference.  Query through the forecast horizon so
+    # every requested valid time can be verified when the archive contains it.
     d_end = datetime.strptime(end_date.replace("-", "")[:8], "%Y%m%d")
     desired_end = d_end + timedelta(hours=horizon_hours)
-    # ERA5 archive max available date check
-    max_era5_date = datetime(2026, 8, 25)
-    actual_era5_end = min(desired_end, max_era5_date)
-    era5_end_str = actual_era5_end.strftime("%Y-%m-%d")
+    era5_end_str = desired_end.strftime("%Y-%m-%d")
 
-    print(f"\n[STEP 2/4] INGESTION — Fetching Historical ERA5 Ground Truth ({start_date} to {era5_end_str})...")
+    print(f"\n[STEP 2/4] INGESTION — Fetching ERA5 Verification Reference ({start_date} to {era5_end_str})...")
     era5_collector = ERA5ReferenceCollector()
     try:
         raw_era5, raw_era5_path, era5_manifest_path, era5_manifest = era5_collector.fetch_historical_reference(
@@ -135,8 +132,8 @@ if __name__ == "__main__":
     parser.add_argument("--location", default="delhi", help="Location name")
     parser.add_argument("--lat", type=float, default=28.6139, help="Latitude")
     parser.add_argument("--lon", type=float, default=77.2090, help="Longitude")
-    parser.add_argument("--start-date", default="2026-08-18", help="Start date (YYYY-MM-DD)")
-    parser.add_argument("--end-date", default="2026-08-24", help="End date (YYYY-MM-DD)")
+    parser.add_argument("--start-date", default="2017-03-14", help="Start date (YYYY-MM-DD)")
+    parser.add_argument("--end-date", default="2017-03-16", help="End date (YYYY-MM-DD)")
     parser.add_argument("--cycle", default="00", help="Cycle hour (00, 06, 12, 18)")
     parser.add_argument("--horizon-hours", type=int, default=72, help="Forecast horizon hours (default: 72)")
     parser.add_argument("--step-hours", type=int, default=3, help="Forecast step hours (default: 3)")

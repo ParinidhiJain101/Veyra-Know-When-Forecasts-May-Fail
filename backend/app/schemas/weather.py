@@ -1,36 +1,63 @@
-"""Canonical Forecast Data Schemas for Veyra."""
-from datetime import datetime
+"""Canonical Forecast Data Schemas for Veyra.
+
+Scientific data contract:
+- preserve requested coordinates separately from provider grid coordinates
+- preserve model/run provenance
+- preserve ensemble statistics
+- never fabricate ensemble metadata
+"""
+
 from typing import Any, Optional
+
 from pydantic import BaseModel, Field, field_validator
 
 
 class CanonicalForecastRecord(BaseModel):
-    """Standardized single time-step forecast observation or ensemble record.
+    """One forecast variable at one valid time.
 
-    Preserves issue_time, valid_time, and strictly calculated lead_hours.
+    `value` is the deterministic/control value.
+    Ensemble statistics are populated only when actual member values
+    were present in the provider response.
     """
 
-    location: str = Field(..., description="Location name or identifier")
-    latitude: float = Field(..., ge=-90.0, le=90.0, description="Geographical latitude in decimal degrees")
-    longitude: float = Field(..., ge=-180.0, le=180.0, description="Geographical longitude in decimal degrees")
-    issue_time: str = Field(..., description="Model initialization / run cycle time (ISO 8601 format)")
-    valid_time: str = Field(..., description="Target forecast verification time (ISO 8601 format)")
-    lead_hours: int = Field(..., ge=0, description="Lead time in hours between issue_time and valid_time")
-    variable: str = Field(..., description="Standardized meteorological variable name (e.g., temperature_2m)")
-    unit: str = Field(..., description="Standardized unit of measurement (e.g., celsius, hPa, m/s)")
-    value: Optional[float] = Field(default=None, description="Deterministic or control forecast value")
-    source: str = Field(default="NOAA_GEFS_OPENMETEO", description="Source forecast model / provider")
+    location: str = Field(...)
+    latitude: float = Field(..., ge=-90.0, le=90.0)
+    longitude: float = Field(..., ge=-180.0, le=180.0)
 
-    # Ensemble summary metrics (populated when available)
-    member_id: Optional[str] = Field(default=None, description="Ensemble member identifier if member-level data")
-    member_count: Optional[int] = Field(default=None, ge=1, description="Number of ensemble members evaluated")
-    ensemble_mean: Optional[float] = Field(default=None, description="Ensemble mean value")
-    ensemble_std: Optional[float] = Field(default=None, ge=0.0, description="Ensemble standard deviation / spread")
-    ensemble_min: Optional[float] = Field(default=None, description="Ensemble minimum value across members")
-    ensemble_max: Optional[float] = Field(default=None, description="Ensemble maximum value across members")
-    q10: Optional[float] = Field(default=None, description="10th percentile ensemble quantile")
-    q90: Optional[float] = Field(default=None, description="90th percentile ensemble quantile")
-    quality_flags: dict[str, Any] = Field(default_factory=dict, description="Quality control evaluation flags")
+    # Actual provider grid cell, when supplied by the API.
+    grid_latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
+    grid_longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
+
+    issue_time: str = Field(...)
+    valid_time: str = Field(...)
+    lead_hours: int = Field(..., ge=0)
+
+    variable: str = Field(...)
+    unit: str = Field(...)
+
+    # Deterministic/control forecast.
+    value: Optional[float] = Field(default=None)
+
+    source: str = Field(default="OPEN_METEO_GFS_ENSEMBLE")
+
+    # Model/run provenance.
+    model: Optional[str] = Field(default=None)
+    model_run: Optional[str] = Field(default=None)
+
+    # Ensemble provenance/statistics.
+    member_id: Optional[str] = Field(default=None)
+    member_count: Optional[int] = Field(default=None, ge=1)
+    ensemble_mean: Optional[float] = Field(default=None)
+    ensemble_std: Optional[float] = Field(default=None, ge=0.0)
+    ensemble_min: Optional[float] = Field(default=None)
+    ensemble_max: Optional[float] = Field(default=None)
+    q10: Optional[float] = Field(default=None)
+    q90: Optional[float] = Field(default=None)
+
+    # Keep raw/member-derived metadata without putting it into ML X
+    # automatically.
+    quality_flags: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("lead_hours")
     @classmethod
@@ -41,12 +68,19 @@ class CanonicalForecastRecord(BaseModel):
 
 
 class CanonicalForecastDataset(BaseModel):
-    """Collection of canonical forecast records for a specific location and issue cycle."""
+    """Collection of canonical forecast records for one location/run."""
 
-    location: str = Field(..., description="Target geographical location")
-    latitude: float = Field(..., description="Latitude")
-    longitude: float = Field(..., description="Longitude")
-    issue_time: str = Field(..., description="Forecast issue / initialization cycle")
-    source: str = Field(default="NOAA_GEFS_OPENMETEO", description="Forecast data source")
-    records: list[CanonicalForecastRecord] = Field(default_factory=list, description="List of time-step records")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Dataset metadata and provider headers")
+    location: str = Field(...)
+    latitude: float = Field(...)
+    longitude: float = Field(...)
+
+    grid_latitude: Optional[float] = Field(default=None)
+    grid_longitude: Optional[float] = Field(default=None)
+
+    issue_time: str = Field(...)
+    source: str = Field(default="OPEN_METEO_GFS_ENSEMBLE")
+    model: Optional[str] = Field(default=None)
+    model_run: Optional[str] = Field(default=None)
+
+    records: list[CanonicalForecastRecord] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)

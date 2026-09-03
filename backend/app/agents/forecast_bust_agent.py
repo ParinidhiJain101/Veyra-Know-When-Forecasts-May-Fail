@@ -119,16 +119,45 @@ class ForecastBustAgent:
         model_result: Optional[ModelResult] = None,
         weather_result: Optional[WeatherResult] = None,
     ) -> PredictionResponse:
-        """Construct the standardized API response payload."""
+        """Construct the standardized API response payload preserving authoritative V2 fields."""
+        m_meta = model_result.metadata if (model_result and model_result.metadata) else {}
+
+        if safety_assessment.abstain or model_result is None or not model_result.is_ready:
+            confidence_index = None
+            uncertainty_pct = None
+            ood_distance = None
+            revision = None
+            stability = None
+            structural_overconfidence = None
+            failure_fingerprint = None
+            dominant_risk_drivers = None
+        else:
+            confidence_index = m_meta.get("confidence_index")
+            uncertainty_pct = m_meta.get("uncertainty_pct")
+            ood_distance = m_meta.get("ood_score") if m_meta.get("ood_score") is not None else m_meta.get("ood_distance")
+            revision = m_meta.get("revision")
+            stability = m_meta.get("stability_index") if m_meta.get("stability_index") is not None else m_meta.get("stability")
+            structural_overconfidence = m_meta.get("structural_overconfidence")
+            failure_fingerprint = m_meta.get("failure_fingerprint")
+            dominant_risk_drivers = m_meta.get("dominant_risk_drivers")
+
         return PredictionResponse(
             location=location,
             bust_probability=safety_assessment.bust_probability,
             risk_level=safety_assessment.risk_level,
             trust_state=safety_assessment.trust_state,
-            abstain=safety_assessment.abstain,
-            reason_codes=safety_assessment.reason_codes,
+            confidence_index=confidence_index,
+            uncertainty_pct=uncertainty_pct,
+            ood_distance=ood_distance,
+            revision=revision,
+            stability=stability,
+            structural_overconfidence=structural_overconfidence,
+            failure_fingerprint=failure_fingerprint,
+            dominant_risk_drivers=dominant_risk_drivers,
             model_version=model_result.model_version if model_result else None,
             data_version=weather_result.data_version if weather_result else None,
+            abstain=safety_assessment.abstain,
+            reason_codes=safety_assessment.reason_codes,
         )
 
     def analyze(self, request: PredictionRequest) -> PredictionResponse:

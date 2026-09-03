@@ -142,12 +142,16 @@ class SafetyEvaluator(BaseSafetyService):
 
     @staticmethod
     def _map_risk_level(prob: float) -> RiskLevel:
-        """Map a calibrated probability to a categorical risk level."""
-        if prob < 0.20:
+        """Map a calibrated probability to categorical risk level using authoritative V2 thresholds.
+
+        Thresholds:
+            p < 0.060          -> LOW
+            0.060 <= p < 0.600 -> ELEVATED
+            p >= 0.600         -> CRITICAL
+        """
+        if prob < 0.060:
             return RiskLevel.LOW
-        elif prob < 0.50:
-            return RiskLevel.MEDIUM
-        elif prob < 0.75:
-            return RiskLevel.HIGH
+        elif prob < 0.600:
+            return RiskLevel.ELEVATED
         else:
             return RiskLevel.CRITICAL

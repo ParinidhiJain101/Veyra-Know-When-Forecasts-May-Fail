@@ -126,7 +126,7 @@ class ExplanationItem:
 
 @dataclass
 class ForecastRiskItem:
-    """Single lead-time forecast risk evaluation."""
+    """Single lead-time forecast risk evaluation with V2 intelligence."""
     valid_time: str
     lead_hours: int
     lead_days: float
@@ -140,10 +140,18 @@ class ForecastRiskItem:
     data_status: str
     verification_status: str
     explanation: ExplanationItem
-    confidence: Optional[float] = None  # None until real OOD/calibration confidence layer is implemented
+    confidence: Optional[float] = None
+    risk_level: Optional[str] = None
+    confidence_index: Optional[float] = None
+    structural_overconfidence: Optional[float] = None
+    stability_index: Optional[float] = None
+    ood_score: Optional[float] = None
+    failure_fingerprint: Optional[str] = None
+    uncertainty_pct: Optional[float] = None
+    dominant_risk_drivers: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             "valid_time": self.valid_time,
             "lead_hours": self.lead_hours,
             "lead_days": round(self.lead_days, 2),
@@ -157,8 +165,25 @@ class ForecastRiskItem:
             "data_status": self.data_status,
             "verification_status": self.verification_status,
             "confidence": self.confidence,
-            "explanation": self.explanation.to_dict(),
+            "explanation": self.explanation.to_dict() if hasattr(self.explanation, "to_dict") else self.explanation,
         }
+        if self.risk_level is not None:
+            d["risk_level"] = self.risk_level
+        if self.confidence_index is not None:
+            d["confidence_index"] = round(self.confidence_index, 1)
+        if self.structural_overconfidence is not None:
+            d["structural_overconfidence"] = round(self.structural_overconfidence, 4)
+        if self.stability_index is not None:
+            d["stability_index"] = round(self.stability_index, 1)
+        if self.ood_score is not None:
+            d["ood_score"] = round(self.ood_score, 2)
+        if self.failure_fingerprint is not None:
+            d["failure_fingerprint"] = self.failure_fingerprint
+        if self.uncertainty_pct is not None:
+            d["uncertainty_pct"] = round(self.uncertainty_pct, 2)
+        if self.dominant_risk_drivers:
+            d["dominant_risk_drivers"] = self.dominant_risk_drivers
+        return d
 
 
 @dataclass

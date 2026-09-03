@@ -18,38 +18,22 @@ router = APIRouter()
 def create_forecast_bust_agent(
     builder2_model_dir: Optional[str] = None,
 ) -> ForecastBustAgent:
-    """Factory creating ForecastBustAgent with active services based on configuration.
-
-    When BUILDER2_MODEL_DIR is configured, Builder 2 feature and model adapters
-    are activated as the primary scientific bust risk pipeline.
-    When BUILDER2_MODEL_DIR is unconfigured or unavailable, falls back to the
-    standard baseline service or safe abstention.
-    """
-    model_dir = builder2_model_dir or settings.BUILDER2_MODEL_DIR or os.getenv("BUILDER2_MODEL_DIR")
-    if model_dir:
-        return ForecastBustAgent(
-            weather_service=OpenMeteoGEFSWeatherService(),
-            feature_service=Builder2FeatureAdapter(),
-            model_service=Builder2ModelAdapter(model_dir=model_dir),
-            safety_evaluator=SafetyEvaluator(),
-        )
+    """Factory creating ForecastBustAgent backed exclusively by Authoritative V2 ForecastIntelligenceService."""
     return ForecastBustAgent(
         weather_service=OpenMeteoGEFSWeatherService(),
-        feature_service=LiveFeatureService(),
-        model_service=LiveLogisticModelService(),
+        feature_service=Builder2FeatureAdapter(),
+        model_service=Builder2ModelAdapter(),
         safety_evaluator=SafetyEvaluator(),
     )
 
 
-# Default live production agent
+# Default live production agent backed by V2 Champion
 _default_agent = create_forecast_bust_agent()
 
 
 def get_forecast_bust_agent() -> ForecastBustAgent:
     """Dependency provider for ForecastBustAgent."""
-    if settings.BUILDER2_MODEL_DIR or os.getenv("BUILDER2_MODEL_DIR"):
-        return create_forecast_bust_agent()
-    return _default_agent
+    return create_forecast_bust_agent()
 
 
 @router.post(

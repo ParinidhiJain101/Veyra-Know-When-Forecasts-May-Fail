@@ -109,6 +109,7 @@ class Builder2FeatureAdapter(BaseFeatureService):
                     "record_count": len(X),
                     "feature_count": len(FEATURE_COLUMN_NAMES),
                     "feature_matrix_rows": X.to_dict(orient="records"),
+                    "forecast_dataframe_rows": df_forecast.to_dict(orient="records"),
                     "metadata_rows": metadata_df.to_dict(orient="records") if not metadata_df.empty else [],
                     "instability_fingerprint": fingerprint_dict,
                     "schema_version": "builder2-canonical-26-v1.0",
