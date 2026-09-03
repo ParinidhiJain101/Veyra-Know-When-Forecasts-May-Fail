@@ -101,6 +101,9 @@ class IssueTimeSafeFeaturePipeline:
         df["valid_time"] = pd.to_datetime(df["valid_time"], utc=True)
         df["issue_time"] = pd.to_datetime(df["issue_time"], utc=True)
 
+        # Track original row ordering to guarantee 1:1 output alignment
+        df["_orig_idx"] = np.arange(len(df))
+
         # Sort chronologically by location, variable, issue_time, valid_time
         sort_keys = ["location", "variable", "issue_time", "valid_time"]
         avail_sort = [k for k in sort_keys if k in df.columns]
@@ -204,6 +207,10 @@ class IssueTimeSafeFeaturePipeline:
         # ---------------------------------------------------------
         df["latitude"] = df["latitude"].astype(float)
         df["longitude"] = df["longitude"].astype(float)
+
+        # Restore exact original input row ordering
+        df = df.sort_values(by="_orig_idx").reset_index(drop=True)
+        df.drop(columns=["_orig_idx"], inplace=True, errors="ignore")
 
         # Build feature DataFrame and metadata DataFrame
         X = df[FEATURE_COLUMN_NAMES].copy()

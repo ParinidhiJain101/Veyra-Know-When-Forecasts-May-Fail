@@ -21,29 +21,32 @@ import pandas as pd
 from api.explainer import ForecastBustExplainer
 from api.location_service import LocationRegistry
 from api.schemas import (
+    ContributingFactor,
     DataStatus,
+    ExplanationItem,
     ForecastRiskItem,
     ForecastRiskResponse,
     LocationInfo,
     ProvenanceInfo,
     VerificationStatus,
 )
-from features.feature_pipeline import FEATURE_COLUMN_NAMES, IssueTimeSafeFeaturePipeline
-from models.model_service import ForecastBustModelService
+from models.forecast_intelligence_service import ForecastIntelligenceService
 
 
 class OperationalRiskEngine:
-    """Operational engine turning weather forecasts into calibrated bust risk products."""
+    """Operational engine turning weather forecasts into calibrated bust risk products via V2 Champion."""
 
     def __init__(
         self,
-        model_service: Optional[ForecastBustModelService] = None,
+        intelligence_service: Optional[ForecastIntelligenceService] = None,
         location_registry: Optional[LocationRegistry] = None,
-        feature_pipeline: Optional[IssueTimeSafeFeaturePipeline] = None,
+        model_service: Optional[Any] = None,
+        feature_pipeline: Optional[Any] = None,
     ):
-        self.model_service = model_service or ForecastBustModelService()
+        self.intelligence_service = intelligence_service or ForecastIntelligenceService()
         self.location_registry = location_registry or LocationRegistry()
-        self.feature_pipeline = feature_pipeline or IssueTimeSafeFeaturePipeline()
+        # Expose model_service property for legacy inspection
+        self.model_service = self.intelligence_service
 
     def evaluate_verification_status(
         self,
@@ -54,36 +57,17 @@ class OperationalRiskEngine:
     ) -> str:
         """
         Derive ground-truth verification status from actual temporal and truth availability context.
-
-        SCIENTIFIC INTEGRITY RULES:
-        1. An actual verified observation pair MUST be present to return HISTORICALLY_VERIFIED.
-        2. If valid_time exceeds an explicit truth archive cutoff, returns UNVERIFIED_HORIZON_NO_TRUTH.
-        3. If valid_time is in the future relative to the clock, returns NO_TRUTH_AVAILABLE.
-        4. If a pair is absent even within the archive window, returns NO_TRUTH_AVAILABLE.
-
-        Args:
-            valid_time: Forecast target time (UTC).
-            issue_time: Forecast cycle initialization time (UTC).
-            max_truth_time_utc: Latest timestamp for which ground truth reanalysis is available.
-            has_verified_truth_pair: True if a verified observation pair exists in the dataset.
-
-        Returns:
-            VerificationStatus string value.
         """
-        # Rule 1: Verified pair takes precedence
         if has_verified_truth_pair:
             return VerificationStatus.HISTORICALLY_VERIFIED.value
 
-        # Rule 2: Past the explicit truth archive window
         if max_truth_time_utc is not None and valid_time > max_truth_time_utc:
             return VerificationStatus.UNVERIFIED_HORIZON_NO_TRUTH.value
 
-        # Rule 3: Future forecast target relative to real-time clock
         now_utc = datetime.now(timezone.utc)
         if valid_time > now_utc:
             return VerificationStatus.NO_TRUTH_AVAILABLE.value
 
-        # Rule 4: Covered by time window or past, but observation pair is absent
         return VerificationStatus.NO_TRUTH_AVAILABLE.value
 
     def resolve_grid_resolution(
@@ -92,12 +76,7 @@ class OperationalRiskEngine:
         df_forecast: Optional[pd.DataFrame] = None,
         forecast_source: Optional[str] = None,
     ) -> str:
-        """
-        Derive grid resolution provenance without silent guesswork.
-
-        Returns:
-            Grid resolution string (e.g. '0.25°', '0.50°') or 'UNKNOWN'.
-        """
+        """Derive grid resolution provenance without silent guesswork."""
         if explicit_res is not None and explicit_res.strip():
             return explicit_res.strip()
 
@@ -124,17 +103,7 @@ class OperationalRiskEngine:
         max_truth_time_utc: Optional[datetime] = None,
     ) -> ForecastRiskResponse:
         """
-        Execute full operational risk pipeline for a standardized forecast DataFrame.
-
-        Args:
-            df_forecast: Standardized forecast DataFrame containing forecast values and ensemble stats.
-            location_id: Identifier of the target location.
-            forecast_source: Name of NWP forecast provider.
-            grid_resolution: Optional grid resolution string.
-            max_truth_time_utc: Optional cutoff timestamp for available ground truth verification.
-
-        Returns:
-            ForecastRiskResponse dataclass.
+        Execute full operational risk pipeline for a standardized forecast DataFrame using V2 Champion.
         """
         if df_forecast.empty:
             raise ValueError("Input forecast DataFrame is empty.")
@@ -157,49 +126,36 @@ class OperationalRiskEngine:
             actual_grid_lon=actual_lon,
         )
 
-        # 4. Extract Features strictly using existing Builder 2 Feature Pipeline
-        if all(c in df_forecast.columns for c in FEATURE_COLUMN_NAMES):
-            X = df_forecast[FEATURE_COLUMN_NAMES].copy()
-            meta_df = df_forecast.copy()
-        else:
-            X, meta_df = self.feature_pipeline.extract_features(df_forecast)
+        # 4. Invoke Authoritative V2 Forecast Intelligence Service
+        results = self.intelligence_service.evaluate_forecast(df_forecast)
 
-        # 5. Invoke Model Service for Batch Inference
-        predictions = self.model_service.predict(X)
+        # 5. Extract metadata & provenance
+        model_version = self.intelligence_service.model_version
+        decision_threshold = float(self.intelligence_service.operational_threshold)
 
-        # 6. Extract metadata & provenance
-        model_meta = self.model_service.get_metadata()
-        model_version = model_meta.get("model_version", "prototype-gbm-v1")
-        decision_threshold = float(model_meta.get("decision_threshold", 0.280))
-
-        issue_time_val = meta_df["issue_time"].iloc[0] if "issue_time" in meta_df.columns else datetime.now(timezone.utc)
+        issue_time_val = df_forecast["issue_time"].iloc[0] if "issue_time" in df_forecast.columns else datetime.now(timezone.utc)
         issue_time_str = pd.to_datetime(issue_time_val, utc=True).isoformat()
 
         provenance = ProvenanceInfo(
             forecast_source=forecast_source,
             grid_resolution=resolved_grid_res,
             model_version=model_version,
-            feature_schema_version=model_meta.get("feature_schema_version", "1.0.0"),
+            feature_schema_version="2.0.0-supercharged-50f",
             prediction_timestamp_utc=datetime.now(timezone.utc).isoformat(),
             truth_source="ECMWF_ERA5_REANALYSIS",
         )
 
-        # 7. Assemble Forecast Risk Items
+        # 6. Assemble Forecast Risk Items with V2 fields
         forecast_items: List[ForecastRiskItem] = []
 
-        for idx, (p_res, (_, row_meta), (_, row_feat)) in enumerate(zip(predictions, meta_df.iterrows(), X.iterrows())):
-            prob = float(p_res["probability"])
-            alert = bool(p_res["bust_alert"])
+        for r in results:
+            prob = float(r.bust_probability)
+            alert = bool(prob >= decision_threshold)
 
-            v_time_dt = pd.to_datetime(row_meta.get("valid_time", issue_time_val), utc=True).to_pydatetime()
-            i_time_dt = pd.to_datetime(row_meta.get("issue_time", issue_time_val), utc=True).to_pydatetime()
+            v_time_dt = pd.to_datetime(r.valid_time, utc=True).to_pydatetime()
+            i_time_dt = pd.to_datetime(r.issue_time, utc=True).to_pydatetime()
 
-            lead_h = int(row_feat["lead_hours"])
-            lead_d = float(row_feat["lead_days"])
-            var_name = str(row_meta.get("variable", "temperature_2m"))
-
-            # Determine verification status dynamically
-            has_truth = "forecast_abs_error" in row_meta and not pd.isna(row_meta["forecast_abs_error"])
+            has_truth = "forecast_abs_error" in df_forecast.columns and not pd.isna(df_forecast["forecast_abs_error"].iloc[0] if len(df_forecast) else None)
             v_status = self.evaluate_verification_status(
                 valid_time=v_time_dt,
                 issue_time=i_time_dt,
@@ -207,35 +163,47 @@ class OperationalRiskEngine:
                 has_verified_truth_pair=has_truth,
             )
 
-            # Generate physical explanation
-            explanation = ForecastBustExplainer.explain_row(
-                feature_row=row_feat.to_dict(),
-                bust_probability=prob,
-                threshold=decision_threshold,
-            )
+            primary_drv = r.dominant_risk_drivers[0].signal_name if r.dominant_risk_drivers else "NONE"
+            drv_summary = r.dominant_risk_drivers[0].description if r.dominant_risk_drivers else "All feature signals nominal."
+            factors = [
+                ContributingFactor(
+                    factor=d.signal_name,
+                    value=float(d.signal_value),
+                    signal=d.risk_direction,
+                )
+                for d in r.dominant_risk_drivers
+            ]
 
-            # Extract forecast values safely
-            f_val = float(row_feat.get("forecast_value", row_meta.get("value", 0.0)))
-            ens_mean = float(row_feat.get("ensemble_mean", f_val))
-            ens_std = float(row_feat.get("ensemble_std", 0.0))
-            unit = str(row_meta.get("unit", "degC" if "temperature" in var_name else ("hPa" if "pressure" in var_name else "km/h")))
+            explanation = ExplanationItem(
+                primary_driver=primary_drv,
+                driver_summary=drv_summary,
+                top_contributing_factors=factors,
+            )
 
             forecast_items.append(
                 ForecastRiskItem(
                     valid_time=v_time_dt.isoformat(),
-                    lead_hours=lead_h,
-                    lead_days=lead_d,
-                    variable=var_name,
-                    forecast_value=f_val,
-                    ensemble_mean=ens_mean,
-                    ensemble_std=ens_std,
-                    unit=unit,
+                    lead_hours=int(r.lead_hours),
+                    lead_days=round(float(r.lead_hours / 24.0), 2),
+                    variable=str(r.variable),
+                    forecast_value=float(r.forecast_value),
+                    ensemble_mean=float(r.ensemble_mean),
+                    ensemble_std=float(r.ensemble_std),
+                    unit=str(r.unit),
                     bust_probability=prob,
                     bust_alert=alert,
                     data_status=DataStatus.MODEL_PREDICTION.value,
                     verification_status=v_status,
                     explanation=explanation,
-                    confidence=None,  # Omitted until real OOD/calibration confidence layer is implemented
+                    confidence=None,
+                    risk_level=str(r.risk_level),
+                    confidence_index=float(r.confidence_index),
+                    structural_overconfidence=float(r.overconfidence_signal),
+                    stability_index=float(r.stability_index),
+                    ood_score=float(r.ood_score),
+                    failure_fingerprint=str(r.provenance.get("failure_fingerprint", "NOMINAL")),
+                    uncertainty_pct=float(r.provenance.get("prediction_uncertainty_pct", 3.37)),
+                    dominant_risk_drivers=[d.to_dict() for d in r.dominant_risk_drivers],
                 )
             )
 

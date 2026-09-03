@@ -246,6 +246,56 @@ class LocationRegistry:
             "verified_grid_latitude": None,
             "verified_grid_longitude": None,
         },
+        "dehradun": {
+            "location_id": "dehradun",
+            "country": "India",
+            "state_region": "Uttarakhand",
+            "city": "Dehradun",
+            "requested_latitude": 30.3165,
+            "requested_longitude": 78.0322,
+            "verified_grid_latitude": None,
+            "verified_grid_longitude": None,
+        },
+        "shimla": {
+            "location_id": "shimla",
+            "country": "India",
+            "state_region": "Himachal Pradesh",
+            "city": "Shimla",
+            "requested_latitude": 31.1048,
+            "requested_longitude": 77.1734,
+            "verified_grid_latitude": None,
+            "verified_grid_longitude": None,
+        },
+        "leh": {
+            "location_id": "leh",
+            "country": "India",
+            "state_region": "Ladakh",
+            "city": "Leh",
+            "requested_latitude": 34.1526,
+            "requested_longitude": 77.5771,
+            "verified_grid_latitude": None,
+            "verified_grid_longitude": None,
+        },
+        "visakhapatnam": {
+            "location_id": "visakhapatnam",
+            "country": "India",
+            "state_region": "Andhra Pradesh",
+            "city": "Visakhapatnam",
+            "requested_latitude": 17.6868,
+            "requested_longitude": 83.2185,
+            "verified_grid_latitude": None,
+            "verified_grid_longitude": None,
+        },
+        "thiruvananthapuram": {
+            "location_id": "thiruvananthapuram",
+            "country": "India",
+            "state_region": "Kerala",
+            "city": "Thiruvananthapuram",
+            "requested_latitude": 8.5241,
+            "requested_longitude": 76.9366,
+            "verified_grid_latitude": None,
+            "verified_grid_longitude": None,
+        },
     }
 
     def __init__(self, custom_locations: Optional[Dict[str, Dict[str, Any]]] = None):
@@ -298,6 +348,10 @@ class LocationRegistry:
             actual_grid_coordinates=actual_coords,
             spatial_distance_km=dist_km,
         )
+
+    def get_all_location_ids(self) -> List[str]:
+        """Return all registered location IDs in deterministic order."""
+        return sorted(self._locations.keys())
 
     def list_locations(self) -> List[Dict[str, Any]]:
         """Return list of all registered locations."""

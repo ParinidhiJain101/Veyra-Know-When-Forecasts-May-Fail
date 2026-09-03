@@ -32,13 +32,13 @@ class ForecastBustAPI:
 
     def get_health(self) -> Dict[str, Any]:
         """Return system health, loaded model version, and runtime status."""
-        model_meta = self.risk_engine.model_service.get_metadata()
+        svc = self.risk_engine.intelligence_service
         return {
             "status": "healthy",
             "service": "Forecast-Bust Sentinel Operational API",
-            "model_version": model_meta.get("model_version", "prototype-gbm-v1"),
-            "decision_threshold": model_meta.get("decision_threshold", 0.280),
-            "feature_count": model_meta.get("feature_count", 26),
+            "model_version": svc.model_version,
+            "decision_threshold": float(svc.operational_threshold),
+            "feature_count": len(svc.feature_names),
             "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         }
 

@@ -259,9 +259,9 @@ def test_8_api_health_endpoint(api_service):
     """Test API health endpoint returns model metadata and healthy state."""
     health = api_service.get_health()
     assert health["status"] == "healthy"
-    assert health["model_version"] == "prototype-gbm-v1"
-    assert health["decision_threshold"] == 0.280
-    assert health["feature_count"] == 26
+    assert health["model_version"] == "veyra-v2-champion-lightgbm"
+    assert health["decision_threshold"] == 0.060
+    assert health["feature_count"] == 50
 
 
 def test_9_api_list_locations_endpoint(api_service):
@@ -290,8 +290,8 @@ def test_10_api_forecast_risk_response_contract(api_service, sample_features_df)
     assert "actual_grid_coordinates" in res_dict["location"]
     assert "spatial_distance_km" in res_dict["location"]
 
-    assert res_dict["model_version"] == "prototype-gbm-v1"
-    assert res_dict["decision_threshold"] == 0.280
+    assert res_dict["model_version"] == "veyra-v2-champion-lightgbm"
+    assert res_dict["decision_threshold"] == 0.060
     assert "provenance" in res_dict
     assert res_dict["provenance"]["grid_resolution"] == "0.25°"
 

@@ -133,32 +133,84 @@ class HistoricalAlignmentEngine:
             is_ground_truth_label=True,
         )
 
-    def align_datasets(
-        self,
-        forecast_records: list[CanonicalForecastRecord],
-        reference_records: list[ReferenceWeatherRecord],
-    ) -> list[AlignedVerificationRecord]:
-        """Bulk align forecast records against reference observations using fast lookup index."""
-        # Index reference records by (normalized_valid_time, variable)
-        ref_index: dict[tuple[str, str], ReferenceWeatherRecord] = {}
+        def align_datasets(
+            self,
+            forecast_records: list[CanonicalForecastRecord],
+            reference_records: list[ReferenceWeatherRecord],
+        ) -> list[AlignedVerificationRecord]:
+            """Bulk-align forecasts with references without cross-location collisions."""
+
+            # Reference identity MUST include location and coordinates.
+        ref_index: dict[
+            tuple[str, str, str, float, float],
+            ReferenceWeatherRecord,
+        ] = {}
+
         for ref in reference_records:
             try:
                 norm_time = self._normalize_iso_time(ref.valid_time)
-                key = (norm_time, ref.variable.lower())
+
+                key = (
+                    ref.location.strip().lower(),
+                    ref.variable.lower(),
+                    norm_time,
+                    round(ref.latitude, 4),
+                    round(ref.longitude, 4),
+                )
+
                 ref_index[key] = ref
+
             except Exception:
                 continue
 
         aligned_records: list[AlignedVerificationRecord] = []
+
         for fc in forecast_records:
             try:
-                fc_norm_time = self._normalize_iso_time(fc.valid_time)
-                fc_key = (fc_norm_time, fc.variable.lower())
-                if fc_key in ref_index:
-                    ref = ref_index[fc_key]
-                    aligned = self.align_single(fc, ref)
-                    if aligned is not None:
-                        aligned_records.append(aligned)
+                norm_time = self._normalize_iso_time(fc.valid_time)
+
+                # Prefer the actual provider grid coordinates when available.
+                match_lat = (
+                    fc.grid_latitude
+                    if fc.grid_latitude is not None
+                    else fc.latitude
+                )
+                match_lon = (
+                    fc.grid_longitude
+                    if fc.grid_longitude is not None
+                    else fc.longitude
+                )
+
+                key = (
+                    fc.location.strip().lower(),
+                    fc.variable.lower(),
+                    norm_time,
+                    round(match_lat, 4),
+                    round(match_lon, 4),
+                )
+
+                ref = ref_index.get(key)
+
+                # Backward-compatible fallback for references that use
+                # requested coordinates instead of provider grid coordinates.
+                if ref is None:
+                    fallback_key = (
+                        fc.location.strip().lower(),
+                        fc.variable.lower(),
+                        norm_time,
+                        round(fc.latitude, 4),
+                        round(fc.longitude, 4),
+                    )
+                    ref = ref_index.get(fallback_key)
+
+                if ref is None:
+                    continue
+
+                aligned = self.align_single(fc, ref)
+
+                if aligned is not None:
+                    aligned_records.append(aligned)
+
             except Exception:
                 continue
 
