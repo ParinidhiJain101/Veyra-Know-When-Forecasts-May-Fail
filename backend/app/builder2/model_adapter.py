@@ -76,7 +76,8 @@ class Builder2ModelAdapter(BaseModelService):
                 error="FeatureResult contains no feature data",
             )
 
-        location_id = feature_result.location or "delhi"
+        from backend.app.services.location_service import get_location_registry
+        location_id = get_location_registry().resolve_canonical_id(feature_result.location) or feature_result.location or "delhi"
         payload = {
             "forecast_data": forecast_data,
             "location_id": location_id,

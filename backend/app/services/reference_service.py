@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 from backend.app.schemas.reference import ReferenceWeatherDataset, ReferenceWeatherRecord
-from backend.app.services.openmeteo_service import KNOWN_LOCATIONS
+from backend.app.services.location_service import KNOWN_LOCATIONS, get_location_registry
 
 logger = logging.getLogger(__name__)
 

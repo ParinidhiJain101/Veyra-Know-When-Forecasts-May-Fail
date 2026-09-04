@@ -77,7 +77,7 @@ def test_multiple_supported_locations_live_predictions(client: TestClient):
 
     app.dependency_overrides[get_forecast_bust_agent] = lambda: test_agent
     try:
-        for city in ["London", "Kolkata", "Tokyo"]:
+        for city in ["London", "Kolkata", "Tokyo", "Bengaluru"]:
             response = client.post("/v1/predict", json={"location": city})
             assert response.status_code == 200
             data = response.json()

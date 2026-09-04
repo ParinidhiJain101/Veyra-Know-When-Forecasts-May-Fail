@@ -19,25 +19,12 @@ from backend.app.schemas.weather import (
     CanonicalForecastRecord,
 )
 from backend.app.services.base import BaseWeatherService, WeatherResult
+from backend.app.services.location_service import (
+    KNOWN_LOCATIONS,
+    get_location_registry,
+)
 
 logger = logging.getLogger(__name__)
-
-
-KNOWN_LOCATIONS: dict[str, tuple[float, float]] = {
-    "london": (51.5074, -0.1278),
-    "tokyo": (35.6762, 139.6503),
-    "new york": (40.7128, -74.0060),
-    "delhi": (28.6139, 77.2090),
-    "kolkata": (22.5726, 88.3639),
-    "mumbai": (19.0760, 72.8777),
-    "berlin": (52.5200, 13.4050),
-    "paris": (48.8566, 2.3522),
-    "singapore": (1.3521, 103.8198),
-    "sydney": (-33.8688, 151.2093),
-    "dubai": (25.2048, 55.2708),
-    "geneva": (46.2044, 6.1432),
-}
-
 
 DEFAULT_ENSEMBLE_API_URL = "https://ensemble-api.open-meteo.com/v1/ensemble"
 
@@ -81,24 +68,10 @@ class OpenMeteoGEFSWeatherService(BaseWeatherService):
             return json.loads(response.read().decode("utf-8"))
 
     def resolve_coordinates(self, location: str) -> Optional[tuple[float, float]]:
-        clean = location.strip().lower()
+        return get_location_registry().resolve_coordinates(location)
 
-        if clean in KNOWN_LOCATIONS:
-            return KNOWN_LOCATIONS[clean]
-
-        if "," in location:
-            parts = location.split(",")
-            if len(parts) == 2:
-                try:
-                    lat = float(parts[0].strip())
-                    lon = float(parts[1].strip())
-
-                    if -90 <= lat <= 90 and -180 <= lon <= 180:
-                        return lat, lon
-                except ValueError:
-                    pass
-
-        return None
+    def resolve_canonical_id(self, location: str) -> Optional[str]:
+        return get_location_registry().resolve_canonical_id(location)
 
     def build_query_url(
         self,
@@ -218,7 +191,6 @@ class OpenMeteoGEFSWeatherService(BaseWeatherService):
         if not times:
             return []
 
-        # Preserve provider-resolved coordinates.
         provider_lat = raw_response.get("latitude")
         provider_lon = raw_response.get("longitude")
 
@@ -232,13 +204,8 @@ class OpenMeteoGEFSWeatherService(BaseWeatherService):
         except (TypeError, ValueError):
             grid_lon = None
 
-        # IMPORTANT:
-        # Do not pretend that the first valid timestamp is a model run.
-        # The seamless endpoint does not give us enough information here to
-        # establish exact historical run provenance.
         issue_time = None
 
-        # Preserve explicit metadata if provider supplies it.
         for key in ("model_run", "run_time", "initialization_time", "init_time"):
             if raw_response.get(key):
                 try:
@@ -247,8 +214,6 @@ class OpenMeteoGEFSWeatherService(BaseWeatherService):
                 except Exception:
                     pass
 
-        # For live serving only, retain the old operational fallback.
-        # Historical dataset construction must use an exact-run endpoint.
         if issue_time is None:
             first_time = str(times[0])
             try:

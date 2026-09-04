@@ -44,10 +44,13 @@ def _get_mock_vendor_payload() -> dict:
 
 
 def test_openmeteo_service_coordinate_resolution():
-    """Test resolution of named cities and coordinate strings."""
+    """Test resolution of named cities and coordinate strings, including canonical Bengaluru."""
     service = OpenMeteoGEFSWeatherService()
     assert service.resolve_coordinates("London") == (51.5074, -0.1278)
     assert service.resolve_coordinates("tokyo") == (35.6762, 139.6503)
+    assert service.resolve_coordinates("Bengaluru") == (12.9716, 77.5946)
+    assert service.resolve_coordinates("bengaluru") == (12.9716, 77.5946)
+    assert service.resolve_coordinates("Bangalore") == (12.9716, 77.5946)
     assert service.resolve_coordinates("40.7128, -74.0060") == (40.7128, -74.0060)
     assert service.resolve_coordinates("UnknownCityXYZ") is None
 
