@@ -122,6 +122,18 @@ class PredictionResponse(BaseModel):
         default=None,
         description="List of primary physical risk drivers contributing to bust probability",
     )
+    decision_mode: Optional[str] = Field(
+        default=None,
+        description="Actionable decision support mode (e.g. HIGH_TRUST, CAUTION, RECHECK_SOON, DO_NOT_RELY_SOLELY, ABSTAIN)",
+    )
+    within_trust_horizon: Optional[bool] = Field(
+        default=None,
+        description="Whether forecast lead time falls within the operational trust horizon",
+    )
+    operational_trust_horizon_hours: Optional[int] = Field(
+        default=None,
+        description="Operational trust horizon limit in lead hours before skill decay",
+    )
     model_version: Optional[str] = Field(
         default=None,
         description="Identifier of the ML model used (e.g., veyra-v2-champion-lightgbm)",

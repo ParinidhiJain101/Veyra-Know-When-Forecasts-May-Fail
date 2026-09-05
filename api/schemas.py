@@ -16,6 +16,17 @@ class DataStatus(str, Enum):
     INSUFFICIENT_FEATURES = "INSUFFICIENT_FEATURES"
     STALE_FORECAST = "STALE_FORECAST"
     SERVICE_ERROR = "SERVICE_ERROR"
+    ABSTAINED = "ABSTAINED"
+
+
+class DecisionMode(str, Enum):
+    """Actionable decision support modes for forecast consumers."""
+    HIGH_TRUST = "HIGH_TRUST"
+    CAUTION = "CAUTION"
+    RECHECK_SOON = "RECHECK_SOON"
+    DO_NOT_RELY_SOLELY = "DO_NOT_RELY_SOLELY"
+    ABSTAIN = "ABSTAIN"
+
 
 
 class VerificationStatus(str, Enum):
@@ -110,6 +121,127 @@ class ContributingFactor:
 
 
 @dataclass
+class FailureFingerprintDetail:
+    """Rich structured diagnostic for atmospheric forecast failure modes."""
+    fingerprint_id: str
+    name: str
+    description: str
+    supporting_signals: List[str] = field(default_factory=list)
+    evidence_state: str = "SUPPORTED_BY_SIGNALS"
+    interpretation: str = ""
+    limitations: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "fingerprint_id": self.fingerprint_id,
+            "name": self.name,
+            "description": self.description,
+            "supporting_signals": self.supporting_signals,
+            "evidence_state": self.evidence_state,
+            "interpretation": self.interpretation,
+            "limitations": self.limitations,
+        }
+
+
+@dataclass
+class TrustTimelineItem:
+    """Per-lead-time forecast reliability and trust state."""
+    lead_hours: int
+    lead_days: float
+    bust_probability: Optional[float] = None
+    risk_level: Optional[str] = None
+    decision_mode: Optional[str] = None
+    within_trust_horizon: bool = True
+    stability_index: Optional[float] = None
+    failure_fingerprint: Optional[str] = None
+    is_available: bool = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "lead_hours": self.lead_hours,
+            "lead_days": round(self.lead_days, 2),
+            "bust_probability": round(self.bust_probability, 4) if self.bust_probability is not None else None,
+            "risk_level": self.risk_level,
+            "decision_mode": self.decision_mode,
+            "within_trust_horizon": self.within_trust_horizon,
+            "stability_index": round(self.stability_index, 1) if self.stability_index is not None else None,
+            "failure_fingerprint": self.failure_fingerprint,
+            "is_available": self.is_available,
+        }
+
+
+@dataclass
+class OperationalTrustHorizonInfo:
+    """Operational trust horizon summary across forecast leads."""
+    operational_trust_horizon_hours: Optional[int]
+    threshold_used: float = 0.35
+    threshold_type: str = "product_design_threshold"
+    status: str = "WITHIN_HORIZON"
+    scientific_note: str = (
+        "Pcrit is a configurable research/product design threshold, not a universal scientific constant. "
+        "Subject to future empirical validation on the 1,040-cycle dataset."
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "operational_trust_horizon_hours": self.operational_trust_horizon_hours,
+            "threshold_used": self.threshold_used,
+            "threshold_type": self.threshold_type,
+            "status": self.status,
+            "scientific_note": self.scientific_note,
+        }
+
+
+@dataclass
+class DecisionGuidance:
+    """High-level actionable decision guidance for end users."""
+    decision_mode: str
+    headline: str
+    actionable_recommendation: str
+    primary_reason: str
+    confidence_summary: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "decision_mode": self.decision_mode,
+            "headline": self.headline,
+            "actionable_recommendation": self.actionable_recommendation,
+            "primary_reason": self.primary_reason,
+            "confidence_summary": self.confidence_summary,
+        }
+
+
+@dataclass
+class DemoScenarioInfo:
+    """Deterministic demonstration fixture descriptor."""
+    scenario_id: str
+    title: str
+    location_id: str
+    city: str
+    variable: str
+    lead_hours: int
+    intended_decision_mode: str
+    description: str
+    disclaimer: str = (
+        "Deterministic demonstration fixture clearly labeled as a demo/simulation scenario. "
+        "NOT a scientific validation case and must NOT be presented as measured real-world performance evidence."
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "scenario_id": self.scenario_id,
+            "title": self.title,
+            "location_id": self.location_id,
+            "city": self.city,
+            "variable": self.variable,
+            "lead_hours": self.lead_hours,
+            "intended_decision_mode": self.intended_decision_mode,
+            "description": self.description,
+            "disclaimer": self.disclaimer,
+        }
+
+
+@dataclass
 class ExplanationItem:
     """Physical explanation of forecast bust risk."""
     primary_driver: str
@@ -149,6 +281,10 @@ class ForecastRiskItem:
     failure_fingerprint: Optional[str] = None
     uncertainty_pct: Optional[float] = None
     dominant_risk_drivers: List[Dict[str, Any]] = field(default_factory=list)
+    decision_mode: Optional[str] = None
+    recommended_action: Optional[str] = None
+    within_trust_horizon: Optional[bool] = None
+    failure_fingerprint_detail: Optional[FailureFingerprintDetail] = None
 
     def to_dict(self) -> Dict[str, Any]:
         d = {
@@ -183,6 +319,14 @@ class ForecastRiskItem:
             d["uncertainty_pct"] = round(self.uncertainty_pct, 2)
         if self.dominant_risk_drivers:
             d["dominant_risk_drivers"] = self.dominant_risk_drivers
+        if self.decision_mode is not None:
+            d["decision_mode"] = self.decision_mode
+        if self.recommended_action is not None:
+            d["recommended_action"] = self.recommended_action
+        if self.within_trust_horizon is not None:
+            d["within_trust_horizon"] = self.within_trust_horizon
+        if self.failure_fingerprint_detail is not None:
+            d["failure_fingerprint_detail"] = self.failure_fingerprint_detail.to_dict()
         return d
 
 
@@ -196,9 +340,12 @@ class ForecastRiskResponse:
     decision_threshold: float
     provenance: ProvenanceInfo
     forecasts: List[ForecastRiskItem]
+    operational_trust_horizon: Optional[OperationalTrustHorizonInfo] = None
+    decision_guidance: Optional[DecisionGuidance] = None
+    trust_timeline: List[TrustTimelineItem] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        res = {
             "request_id": self.request_id,
             "location": self.location.to_dict(),
             "issue_time": self.issue_time,
@@ -207,6 +354,13 @@ class ForecastRiskResponse:
             "provenance": self.provenance.to_dict(),
             "forecasts": [f.to_dict() for f in self.forecasts],
         }
+        if self.operational_trust_horizon is not None:
+            res["operational_trust_horizon"] = self.operational_trust_horizon.to_dict()
+        if self.decision_guidance is not None:
+            res["decision_guidance"] = self.decision_guidance.to_dict()
+        if self.trust_timeline:
+            res["trust_timeline"] = [t.to_dict() for t in self.trust_timeline]
+        return res
 
 
 @dataclass

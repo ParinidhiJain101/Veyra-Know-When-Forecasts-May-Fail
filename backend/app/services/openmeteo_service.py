@@ -30,6 +30,8 @@ KNOWN_LOCATIONS: dict[str, tuple[float, float]] = {
     "delhi": (28.6139, 77.2090),
     "kolkata": (22.5726, 88.3639),
     "mumbai": (19.0760, 72.8777),
+    "bengaluru": (12.9716, 77.5946),
+    "bangalore": (12.9716, 77.5946),
     "berlin": (52.5200, 13.4050),
     "paris": (48.8566, 2.3522),
     "singapore": (1.3521, 103.8198),
@@ -62,7 +64,7 @@ class OpenMeteoGEFSWeatherService(BaseWeatherService):
         qc_validator: Optional[ForecastQualityControl] = None,
         http_client: Optional[Callable[[str], dict[str, Any]]] = None,
         data_version: str = "gfs-ensemble-openmeteo-v2.0",
-        timeout_seconds: int = 10,
+        timeout_seconds: int = 25,
     ):
         self.api_url = api_url
         self.qc = qc_validator or ForecastQualityControl()
@@ -82,6 +84,14 @@ class OpenMeteoGEFSWeatherService(BaseWeatherService):
 
     def resolve_coordinates(self, location: str) -> Optional[tuple[float, float]]:
         clean = location.strip().lower()
+
+        try:
+            from backend.app.services.location_service import get_location_registry
+            coords = get_location_registry().resolve_coordinates(clean)
+            if coords is not None:
+                return (round(coords[0], 4), round(coords[1], 4))
+        except Exception:
+            pass
 
         if clean in KNOWN_LOCATIONS:
             return KNOWN_LOCATIONS[clean]

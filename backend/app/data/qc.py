@@ -20,7 +20,7 @@ class QualityControlResult:
 # Physical bounds dictionary for meteorological parameters
 PHYSICAL_BOUNDS: dict[str, tuple[float, float, str]] = {
     "temperature_2m": (-90.0, 60.0, "celsius"),
-    "surface_pressure": (800.0, 1100.0, "hPa"),
+    "surface_pressure": (500.0, 1100.0, "hPa"),
     "wind_speed_10m": (0.0, 150.0, "m/s"),
     "relative_humidity_2m": (0.0, 100.0, "%"),
     "precipitation": (0.0, 1000.0, "mm"),

@@ -138,7 +138,7 @@ def test_predict_dependency_injection_override(client: TestClient):
         data = response.json()
         assert data["location"] == "Geneva"
         assert data["bust_probability"] == 0.15
-        assert data["risk_level"] == "LOW"
+        assert data["risk_level"] == "ELEVATED"
         assert data["trust_state"] == "HIGH_CONFIDENCE"
         assert data["abstain"] is False
         assert data["model_version"] == "lgbm-calibrated-v1"

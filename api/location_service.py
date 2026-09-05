@@ -113,12 +113,6 @@ class LocationRegistry:
             if not self._include_extended and item.get("is_extended", False):
                 continue
 
-            # For 25 candidate completeness in api.location_service:
-            # When include_extended is True without include_international, exclude foundation-only locations
-            if self._include_extended and not self._include_international:
-                if loc_id in {"dehradun", "leh"}:
-                    continue
-
             self._register_internal(loc_id, item)
 
     def _register_internal(self, loc_id: str, cfg: Dict[str, Any]) -> None:
@@ -170,6 +164,13 @@ class LocationRegistry:
     def has_location(self, location_id_or_alias: str) -> bool:
         """Check if a location_id or alias is registered."""
         return self.resolve_location_id(location_id_or_alias) is not None
+
+    def get(self, location_id_or_alias: str) -> Optional[LocationInfo]:
+        """Safely get location info by ID or alias, or return None if not found."""
+        try:
+            return self.get_location(location_id_or_alias)
+        except (KeyError, ValueError):
+            return None
 
     def get_location(
         self,

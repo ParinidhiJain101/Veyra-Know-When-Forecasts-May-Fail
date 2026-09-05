@@ -71,7 +71,17 @@ scratch/
 *.h5
 *.hdf5
 
+# Logs & Temporary outputs
+*.log
+*.tmp
+temp/
+tmp/
+BROWSER_E2E_AUDIT.md
+CURRENT_STATE_AUDIT.md
+
 # Model Artifacts
 models/*
 !models/.gitkeep
+!models/*.py
+!models/**/*.json
 

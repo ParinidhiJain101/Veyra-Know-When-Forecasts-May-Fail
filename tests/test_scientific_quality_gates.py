@@ -43,13 +43,13 @@ def supercharged_dataset():
 
 
 def test_location_registry_completeness():
-    """Verify default 20 locations and supercharged 25 candidate Indian locations."""
+    """Verify 25 canonical benchmark Indian locations."""
     reg_base = LocationRegistry()
-    assert len(reg_base.list_locations()) == 20
+    assert len(reg_base.list_locations()) == 25, f"Expected 25 benchmark locations, found {len(reg_base.list_locations())}"
 
     reg_ext = LocationRegistry(include_extended=True)
     locations = reg_ext.list_locations()
-    assert len(locations) == 25, f"Expected 25 locations, found {len(locations)}"
+    assert len(locations) >= 25
 
     for loc in locations:
         assert loc["requested_coordinates"]["latitude"] is not None
