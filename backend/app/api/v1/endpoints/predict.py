@@ -22,7 +22,7 @@ def create_forecast_bust_agent() -> ForecastBustAgent:
     return ForecastBustAgent(
         weather_service=OpenMeteoGEFSWeatherService(),
         feature_service=Builder2FeatureAdapter(),
-        model_service=Builder2ModelAdapter(api_url=target_url, timeout_seconds=2.0),
+        model_service=Builder2ModelAdapter(api_url=target_url, timeout_seconds=30.0),
         safety_evaluator=SafetyEvaluator(),
     )
 

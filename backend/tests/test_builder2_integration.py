@@ -43,12 +43,19 @@ from backend.app.services.openmeteo_service import OpenMeteoGEFSWeatherService
 def _get_mock_v2_response() -> dict:
     """Return an authoritative V2 response payload matching Builder 2 forecast intelligence."""
     return {
-        "model_version": "veyra-v2-champion-lightgbm",
+        "model_version": "veyra-v3-benchmark-lightgbm",
         "decision_threshold": 0.060,
+        "decision_mode": "CAUTION",
+        "operational_trust_horizon": {
+            "operational_trust_horizon_hours": 72,
+            "threshold_used": 0.35,
+        },
         "forecasts": [
             {
                 "bust_probability": 0.0996,
                 "risk_level": "ELEVATED",
+                "decision_mode": "CAUTION",
+                "within_trust_horizon": True,
                 "confidence_index": 95.0,
                 "structural_overconfidence": 0.02,
                 "ood_score": 0.05,
@@ -208,7 +215,7 @@ def test_feature_adapter_weather_unavailable():
 def test_model_adapter_unconfigured_fails_safely():
     """Test model adapter fails safely when artifacts are not reachable."""
     adapter = Builder2ModelAdapter(api_url="http://127.0.0.1:99999")
-    assert adapter.model_version == "veyra-v2-champion-lightgbm"
+    assert adapter.model_version == "veyra-v3-benchmark-lightgbm"
 
     feat_result = FeatureResult(
         location="London",
@@ -229,7 +236,7 @@ def test_model_adapter_loaded_prediction_bounds_and_determinism(mock_urlopen):
     mock_urlopen.return_value = _make_mock_http_response(_get_mock_v2_response())
 
     adapter = Builder2ModelAdapter(api_url="http://localhost:8001")
-    assert adapter.model_version == "veyra-v2-champion-lightgbm"
+    assert adapter.model_version == "veyra-v3-benchmark-lightgbm"
     assert adapter.threshold == 0.060
 
     sample_dict = {
@@ -257,7 +264,7 @@ def test_model_adapter_loaded_prediction_bounds_and_determinism(mock_urlopen):
     assert res1.is_ready is True
     assert res1.probability is not None
     assert 0.0 <= res1.probability <= 1.0
-    assert res1.model_version == "veyra-v2-champion-lightgbm"
+    assert res1.model_version == "veyra-v3-benchmark-lightgbm"
     assert res1.metadata["decision_threshold"] == 0.060
     assert res1.metadata["risk_level"] == "ELEVATED"
 
@@ -350,7 +357,7 @@ def test_forecast_bust_agent_end_to_end_with_builder2(mock_urlopen):
     assert resp.location == "Delhi"
     assert resp.bust_probability is not None
     assert 0.0 <= resp.bust_probability <= 1.0
-    assert resp.model_version == "veyra-v2-champion-lightgbm"
+    assert resp.model_version == "veyra-v3-benchmark-lightgbm"
     assert resp.risk_level == RiskLevel.ELEVATED
     assert resp.abstain is False
     assert resp.trust_state in [TrustState.HIGH_CONFIDENCE, TrustState.MODERATE_CONFIDENCE, TrustState.LOW_CONFIDENCE]
@@ -486,3 +493,76 @@ def test_day7_instability_metadata_does_not_alter_prediction(mock_urlopen):
     mock_urlopen.return_value = _make_mock_http_response(_get_mock_v2_response())
     p_no = model_adapter.predict(res_no).probability
     assert p_with == p_no
+
+
+# =====================================================================
+# 6. Decision Intelligence Fields Propagation Test
+# =====================================================================
+
+@patch("urllib.request.urlopen")
+def test_decision_intelligence_fields_propagation(mock_urlopen):
+    """Verify that decision_mode, within_trust_horizon, and operational_trust_horizon_hours survive Builder2 -> ModelAdapter -> ForecastBustAgent -> PredictionResponse."""
+    mock_urlopen.return_value = _make_mock_http_response(_get_mock_v2_response())
+
+    records = [
+        CanonicalForecastRecord(
+            location="Delhi",
+            latitude=28.5,
+            longitude=77.25,
+            issue_time="2026-08-15T00:00:00Z",
+            valid_time="2026-08-16T00:00:00Z",
+            lead_hours=24,
+            variable="temperature_2m",
+            unit="celsius",
+            value=30.5,
+            member_count=31,
+            ensemble_mean=30.2,
+            ensemble_std=1.2,
+        )
+    ]
+    weather_result = WeatherResult(
+        location="Delhi",
+        is_available=True,
+        data_version="gfs-ensemble-openmeteo-v2.0",
+        raw_data={"records": [r.model_dump() for r in records]},
+    )
+
+    class MockWeather(OpenMeteoGEFSWeatherService):
+        def get_forecast(self, location, target_date=None):
+            return weather_result
+
+    agent = ForecastBustAgent(
+        weather_service=MockWeather(),
+        feature_service=Builder2FeatureAdapter(),
+        model_service=Builder2ModelAdapter(api_url="http://localhost:8001"),
+        safety_evaluator=SafetyEvaluator(),
+    )
+
+    resp = agent.analyze(PredictionRequest(location="Delhi"))
+
+    # Assert decision intelligence fields are populated on success
+    assert resp.abstain is False
+    assert resp.decision_mode == "CAUTION"
+    assert resp.within_trust_horizon is True
+    assert resp.operational_trust_horizon_hours == 72
+
+    # Assert decision intelligence fields are None when abstaining
+    class FailingWeather(OpenMeteoGEFSWeatherService):
+        def get_forecast(self, location, target_date=None):
+            return WeatherResult(
+                location=location,
+                is_available=False,
+                error="Forced failure",
+            )
+
+    abstain_agent = ForecastBustAgent(
+        weather_service=FailingWeather(),
+        feature_service=Builder2FeatureAdapter(),
+        model_service=Builder2ModelAdapter(api_url="http://localhost:8001"),
+        safety_evaluator=SafetyEvaluator(),
+    )
+    abstain_resp = abstain_agent.analyze(PredictionRequest(location="Delhi"))
+    assert abstain_resp.abstain is True
+    assert abstain_resp.decision_mode is None
+    assert abstain_resp.within_trust_horizon is None
+    assert abstain_resp.operational_trust_horizon_hours is None
