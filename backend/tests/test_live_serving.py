@@ -123,7 +123,7 @@ def test_end_to_end_agent_live_prediction():
     assert response.location == "London"
     assert response.bust_probability is not None
     assert 0.0 <= response.bust_probability <= 1.0
-    assert response.risk_level in [RiskLevel.LOW, RiskLevel.MEDIUM, RiskLevel.HIGH, RiskLevel.CRITICAL]
+    assert response.risk_level in [RiskLevel.LOW, RiskLevel.ELEVATED, RiskLevel.CRITICAL]
     assert response.trust_state == TrustState.HIGH_CONFIDENCE
     assert response.abstain is False
     assert response.reason_codes == [ReasonCode.SUCCESS.value]

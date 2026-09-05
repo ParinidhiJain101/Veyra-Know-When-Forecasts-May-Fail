@@ -131,6 +131,9 @@ class ForecastBustAgent:
             structural_overconfidence = None
             failure_fingerprint = None
             dominant_risk_drivers = None
+            decision_mode = None
+            within_trust_horizon = None
+            operational_trust_horizon_hours = None
         else:
             confidence_index = m_meta.get("confidence_index")
             uncertainty_pct = m_meta.get("uncertainty_pct")
@@ -140,6 +143,9 @@ class ForecastBustAgent:
             structural_overconfidence = m_meta.get("structural_overconfidence")
             failure_fingerprint = m_meta.get("failure_fingerprint")
             dominant_risk_drivers = m_meta.get("dominant_risk_drivers")
+            decision_mode = m_meta.get("decision_mode")
+            within_trust_horizon = m_meta.get("within_trust_horizon")
+            operational_trust_horizon_hours = m_meta.get("operational_trust_horizon_hours")
 
         return PredictionResponse(
             location=location,
@@ -154,6 +160,9 @@ class ForecastBustAgent:
             structural_overconfidence=structural_overconfidence,
             failure_fingerprint=failure_fingerprint,
             dominant_risk_drivers=dominant_risk_drivers,
+            decision_mode=decision_mode,
+            within_trust_horizon=within_trust_horizon,
+            operational_trust_horizon_hours=operational_trust_horizon_hours,
             model_version=model_result.model_version if model_result else None,
             data_version=weather_result.data_version if weather_result else None,
             abstain=safety_assessment.abstain,

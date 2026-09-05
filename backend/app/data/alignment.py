@@ -132,15 +132,14 @@ class HistoricalAlignmentEngine:
             alignment_status=alignment_status,
             is_ground_truth_label=True,
         )
+    def align_datasets(
+        self,
+        forecast_records: list[CanonicalForecastRecord],
+        reference_records: list[ReferenceWeatherRecord],
+    ) -> list[AlignedVerificationRecord]:
+        """Bulk-align forecasts with references without cross-location collisions."""
 
-        def align_datasets(
-            self,
-            forecast_records: list[CanonicalForecastRecord],
-            reference_records: list[ReferenceWeatherRecord],
-        ) -> list[AlignedVerificationRecord]:
-            """Bulk-align forecasts with references without cross-location collisions."""
-
-            # Reference identity MUST include location and coordinates.
+        # Reference identity MUST include location and coordinates.
         ref_index: dict[
             tuple[str, str, str, float, float],
             ReferenceWeatherRecord,

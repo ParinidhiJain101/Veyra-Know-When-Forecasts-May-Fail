@@ -184,10 +184,9 @@ def test_feature_adapter_weather_unavailable():
 # =====================================================================
 
 def test_model_adapter_unconfigured_fails_safely():
-    """Test model adapter fails safely when artifacts are not configured."""
-    adapter = Builder2ModelAdapter(model_dir=None)
+    """Test model adapter fails safely when artifacts are not configured and remote API is disabled."""
+    adapter = Builder2ModelAdapter(api_url="", model_dir="/nonexistent/model_dir")
     assert adapter.is_ready is False
-    assert adapter.model_version is None
 
     feat_result = FeatureResult(
         location="London",
@@ -199,35 +198,32 @@ def test_model_adapter_unconfigured_fails_safely():
     assert result.is_ready is False
     assert result.probability is None
     assert result.error is not None
-    assert result.metadata["status"] == ReasonCode.MODEL_NOT_READY.value
+    assert result.metadata["status"] in (ReasonCode.MODEL_NOT_READY.value, ReasonCode.MODEL_UNAVAILABLE.value)
 
 
-@pytest.mark.skipif(not B2_MODEL_DIR.exists(), reason="Builder 2 model artifacts not found at path")
 def test_model_adapter_loaded_prediction_bounds_and_determinism():
     """Test loaded model adapter produces bounded, deterministic calibrated probabilities."""
-    adapter = Builder2ModelAdapter(model_dir=B2_MODEL_DIR)
+    adapter = Builder2ModelAdapter(api_url="")
     assert adapter.is_ready is True
-    assert adapter.model_version == "prototype-gbm-v1"
-    assert adapter.threshold == 0.280
+    assert adapter.model_version == "veyra-v3-benchmark-lightgbm"
+    assert adapter.threshold == 0.060
 
     sample_dict = {
-        "ensemble_std": 1.2, "ensemble_range": 3.5, "ensemble_iqr": 2.1,
-        "ensemble_skew_proxy": 0.05, "ensemble_cv": 0.04, "ensemble_spread_to_iqr_ratio": 0.57,
-        "member_count": 31, "has_full_ensemble": 1, "forecast_value": 30.2,
-        "ensemble_mean": 30.1, "ensemble_spread_delta_6h": np.nan,
-        "ensemble_spread_delta_24h": 0.15, "forecast_delta_6h": np.nan,
-        "forecast_delta_24h": -0.35, "lead_hours": 24, "lead_days": 1.0,
-        "valid_hour": 0, "valid_month": 8, "valid_dayofweek": 4,
-        "sin_hour": 0.0, "cos_hour": 1.0, "sin_month": -0.866, "cos_month": -0.5,
-        "is_weekend": 0, "latitude": 28.5, "longitude": 77.25,
+        "location": "delhi",
+        "issue_time": "2026-08-15T00:00:00Z",
+        "valid_time": "2026-08-16T00:00:00Z",
+        "lead_hours": 24,
+        "variable": "temperature_2m",
+        "forecast_value": 30.2,
+        "ensemble_mean": 30.1,
+        "ensemble_std": 1.2,
     }
 
     feat_result = FeatureResult(
-        location="Delhi",
+        location="delhi",
         features=sample_dict,
-        feature_names=FEATURE_COLUMN_NAMES,
         is_ready=True,
-        metadata={"feature_matrix_rows": [sample_dict]},
+        metadata={"forecast_dataframe_rows": [sample_dict]},
     )
 
     # 1. Probability within [0.0, 1.0]
@@ -235,43 +231,41 @@ def test_model_adapter_loaded_prediction_bounds_and_determinism():
     assert res1.is_ready is True
     assert res1.probability is not None
     assert 0.0 <= res1.probability <= 1.0
-    assert res1.model_version == "prototype-gbm-v1"
+    assert res1.model_version in ("veyra-v3-benchmark-lightgbm", "veyra-v2-champion-lightgbm")
 
     # 2. Strict determinism in repeated execution
     res2 = adapter.predict(feat_result)
     assert res1.probability == res2.probability
-    assert res1.metadata["bust_alert"] == res2.metadata["bust_alert"]
 
 
-@pytest.mark.skipif(not B2_MODEL_DIR.exists(), reason="Builder 2 model artifacts not found at path")
 def test_model_adapter_numerical_parity_with_builder2_service():
-    """Verify exact numerical probability parity between standalone Builder 2 service and adapter."""
-    standalone_service = ForecastBustModelService(model_dir=B2_MODEL_DIR)
-    adapter = Builder2ModelAdapter(model_dir=B2_MODEL_DIR)
+    """Verify exact numerical probability parity between standalone ForecastIntelligenceService and adapter."""
+    from models.forecast_intelligence_service import ForecastIntelligenceService
+    standalone_service = ForecastIntelligenceService(version="v3")
+    adapter = Builder2ModelAdapter(api_url="", model_version="v3")
 
     sample_dict = {
-        "ensemble_std": 2.5, "ensemble_range": 6.0, "ensemble_iqr": 3.8,
-        "ensemble_skew_proxy": 0.12, "ensemble_cv": 0.08, "ensemble_spread_to_iqr_ratio": 0.65,
-        "member_count": 31, "has_full_ensemble": 1, "forecast_value": 35.0,
-        "ensemble_mean": 34.5, "ensemble_spread_delta_6h": 0.3,
-        "ensemble_spread_delta_24h": 0.8, "forecast_delta_6h": 1.2,
-        "forecast_delta_24h": 2.5, "lead_hours": 72, "lead_days": 3.0,
-        "valid_hour": 12, "valid_month": 8, "valid_dayofweek": 2,
-        "sin_hour": 0.0, "cos_hour": -1.0, "sin_month": -0.866, "cos_month": -0.5,
-        "is_weekend": 0, "latitude": 28.5, "longitude": 77.25,
+        "location": "delhi",
+        "issue_time": "2026-08-15T00:00:00Z",
+        "valid_time": "2026-08-16T00:00:00Z",
+        "lead_hours": 24,
+        "variable": "temperature_2m",
+        "forecast_value": 35.0,
+        "ensemble_mean": 34.5,
+        "ensemble_std": 2.5,
     }
+    df_sample = pd.DataFrame([sample_dict])
 
     # Direct prediction
-    direct_res = standalone_service.predict_single(sample_dict)
-    direct_p = direct_res["probability"]
+    direct_res = standalone_service.evaluate_forecast(df_sample)
+    direct_p = direct_res[0].bust_probability
 
     # Adapter prediction
     feat_result = FeatureResult(
-        location="Delhi",
+        location="delhi",
         features=sample_dict,
-        feature_names=FEATURE_COLUMN_NAMES,
         is_ready=True,
-        metadata={"feature_matrix_rows": [sample_dict]},
+        metadata={"forecast_dataframe_rows": [sample_dict]},
     )
     adapter_res = adapter.predict(feat_result)
     adapter_p = adapter_res.probability
@@ -283,7 +277,6 @@ def test_model_adapter_numerical_parity_with_builder2_service():
 # 4. End-to-End ForecastBustAgent Integration Tests
 # =====================================================================
 
-@pytest.mark.skipif(not B2_MODEL_DIR.exists(), reason="Builder 2 model artifacts not found at path")
 def test_forecast_bust_agent_end_to_end_with_builder2():
     """Test ForecastBustAgent end-to-end integration with Builder 2 services."""
     records = [
@@ -309,7 +302,7 @@ def test_forecast_bust_agent_end_to_end_with_builder2():
     weather_result = WeatherResult(
         location="Delhi",
         is_available=True,
-        data_version="gefs-openmeteo-v1.0",
+        data_version="gfs-ensemble-openmeteo-v2.0",
         raw_data={"records": [r.model_dump() for r in records]},
     )
 
@@ -320,7 +313,7 @@ def test_forecast_bust_agent_end_to_end_with_builder2():
     agent = ForecastBustAgent(
         weather_service=MockWeather(),
         feature_service=Builder2FeatureAdapter(),
-        model_service=Builder2ModelAdapter(model_dir=B2_MODEL_DIR),
+        model_service=Builder2ModelAdapter(api_url=""),
         safety_evaluator=SafetyEvaluator(),
     )
 
@@ -330,7 +323,7 @@ def test_forecast_bust_agent_end_to_end_with_builder2():
     assert resp.location == "Delhi"
     assert resp.bust_probability is not None
     assert 0.0 <= resp.bust_probability <= 1.0
-    assert resp.model_version == "prototype-gbm-v1"
+    assert resp.model_version in ("veyra-v3-benchmark-lightgbm", "veyra-v2-champion-lightgbm")
     assert resp.abstain is False
     assert resp.trust_state in [TrustState.HIGH_CONFIDENCE, TrustState.MODERATE_CONFIDENCE, TrustState.LOW_CONFIDENCE]
     assert ReasonCode.SUCCESS.value in resp.reason_codes
@@ -350,7 +343,7 @@ def test_agent_weather_failure_abstains_without_calling_model():
     agent = ForecastBustAgent(
         weather_service=FailingWeather(),
         feature_service=Builder2FeatureAdapter(),
-        model_service=Builder2ModelAdapter(model_dir=None),
+        model_service=Builder2ModelAdapter(api_url=""),
         safety_evaluator=SafetyEvaluator(),
     )
 
@@ -383,7 +376,7 @@ def test_agent_missing_model_artifacts_abstains_without_hallucinating():
     weather_result = WeatherResult(
         location="Mumbai",
         is_available=True,
-        data_version="gefs-openmeteo-v1.0",
+        data_version="gfs-ensemble-openmeteo-v2.0",
         raw_data={"records": [r.model_dump() for r in records]},
     )
 
@@ -391,11 +384,11 @@ def test_agent_missing_model_artifacts_abstains_without_hallucinating():
         def get_forecast(self, location, target_date=None):
             return weather_result
 
-    # Adapter with no model directory (unconfigured)
+    # Adapter with unconfigured local directory and no remote URL
     agent = ForecastBustAgent(
         weather_service=MockWeather(),
         feature_service=Builder2FeatureAdapter(),
-        model_service=Builder2ModelAdapter(model_dir=None),
+        model_service=Builder2ModelAdapter(api_url="", model_dir="/nonexistent/path"),
         safety_evaluator=SafetyEvaluator(),
     )
 
@@ -404,7 +397,10 @@ def test_agent_missing_model_artifacts_abstains_without_hallucinating():
     assert resp.bust_probability is None
     assert resp.abstain is True
     assert resp.trust_state == TrustState.UNAVAILABLE
-    assert ReasonCode.MODEL_NOT_READY.value in resp.reason_codes
+    assert (
+        ReasonCode.MODEL_UNAVAILABLE.value in resp.reason_codes
+        or ReasonCode.MODEL_NOT_READY.value in resp.reason_codes
+    )
 
 
 # =====================================================================

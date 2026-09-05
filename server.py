@@ -19,7 +19,7 @@ import os
 import sys
 import json
 import traceback
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from datetime import datetime, timezone
 import pandas as pd
@@ -86,6 +86,20 @@ class VeyraHTTPRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(locs, 200)
             except Exception as exc:
                 self._send_json({"error": str(exc)}, 500)
+        elif path == "/api/scenarios":
+            try:
+                scenarios = get_api().list_scenarios()
+                self._send_json(scenarios, 200)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, 500)
+        elif path.startswith("/api/scenarios/"):
+            try:
+                parts = [p for p in path.split("/") if p and p != "api" and p != "scenarios"]
+                scenario_id = parts[-1] if parts else "scenario_a_high_trust"
+                result = get_api().run_scenario(scenario_id)
+                self._send_json(result, 200)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, 500)
         elif path == "/" or path == "/index.html":
             static_file = PROJECT_ROOT / "static" / "index.html"
             if static_file.exists():
@@ -93,6 +107,9 @@ class VeyraHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(content)))
+                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                self.send_header("Pragma", "no-cache")
+                self.send_header("Expires", "0")
                 self.end_headers()
                 self.wfile.write(content)
             else:
@@ -108,10 +125,17 @@ class VeyraHTTPRequestHandler(BaseHTTPRequestHandler):
                 body_bytes = self.rfile.read(content_length)
                 body = json.loads(body_bytes.decode("utf-8")) if body_bytes else {}
 
-                forecast_data = body.get("forecast_data", [])
-                location_id = body.get("location_id", "delhi")
-                forecast_source = body.get("forecast_source", "NOAA_GEFS")
-                grid_resolution = body.get("grid_resolution")
+                forecast_data = (
+                    body.get("forecast_data")
+                    or body.get("records")
+                    or body.get("forecasts")
+                    or body
+                )
+                if isinstance(forecast_data, dict) and any(k in forecast_data for k in ("records", "forecast_data", "forecasts")):
+                    forecast_data = forecast_data.get("records") or forecast_data.get("forecast_data") or forecast_data.get("forecasts")
+                location_id = body.get("location_id", "delhi") if isinstance(body, dict) else "delhi"
+                forecast_source = body.get("forecast_source", "NOAA_GEFS") if isinstance(body, dict) else "NOAA_GEFS"
+                grid_resolution = body.get("grid_resolution") if isinstance(body, dict) else None
 
                 result = get_api().get_forecast_risk(
                     forecast_input=forecast_data,
@@ -119,6 +143,17 @@ class VeyraHTTPRequestHandler(BaseHTTPRequestHandler):
                     forecast_source=forecast_source,
                     grid_resolution=grid_resolution,
                 )
+                self._send_json(result, 200)
+            except Exception as exc:
+                traceback.print_exc()
+                self._send_json({"error": str(exc)}, 500)
+        elif path == "/api/scenarios/run" or path == "/api/scenarios":
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+                body_bytes = self.rfile.read(content_length)
+                body = json.loads(body_bytes.decode("utf-8")) if body_bytes else {}
+                scenario_id = body.get("scenario_id", "scenario_a_high_trust")
+                result = get_api().run_scenario(scenario_id)
                 self._send_json(result, 200)
             except Exception as exc:
                 traceback.print_exc()
@@ -132,12 +167,12 @@ class VeyraHTTPRequestHandler(BaseHTTPRequestHandler):
 
 
 def run_server(port: int = 8001, host: str = "127.0.0.1"):
-    print(f"Starting Veyra Authoritative V2 HTTP Server on http://{host}:{port} ...")
+    print(f"Starting Veyra Authoritative V2 HTTP Server on http://{host}:{port} ...", flush=True)
     # Pre-warm model
     get_api()
     server_address = (host, port)
-    httpd = HTTPServer(server_address, VeyraHTTPRequestHandler)
-    print(f"Veyra V2 HTTP Server ready and serving on http://{host}:{port}")
+    httpd = ThreadingHTTPServer(server_address, VeyraHTTPRequestHandler)
+    print(f"Veyra V2 HTTP Server ready and serving on http://{host}:{port}", flush=True)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

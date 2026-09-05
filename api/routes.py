@@ -2,7 +2,7 @@
 API Router and Service Handlers.
 
 Provides typed dispatching functions for health checks, location listings,
-forecast risk inference, and regional risk aggregations.
+forecast risk inference, regional risk aggregations, and deterministic demonstration scenarios.
 """
 
 from datetime import datetime, timezone
@@ -10,6 +10,7 @@ import json
 from typing import Any, Dict, List, Optional, Union
 import pandas as pd
 
+from api.demo_scenarios import DEMO_SCENARIOS_METADATA, generate_scenario_dataframe
 from api.location_service import LocationRegistry
 from api.regional_aggregator import RegionalRiskAggregator
 from api.risk_engine import OperationalRiskEngine
@@ -38,6 +39,8 @@ class ForecastBustAPI:
             "service": "Forecast-Bust Sentinel Operational API",
             "model_version": svc.model_version,
             "decision_threshold": float(svc.operational_threshold),
+            "trust_horizon_threshold": float(self.risk_engine.trust_horizon_threshold),
+            "ood_severe_threshold": float(self.risk_engine.ood_severe_threshold),
             "feature_count": len(svc.feature_names),
             "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         }
@@ -49,6 +52,31 @@ class ForecastBustAPI:
             "count": len(locations),
             "locations": locations,
         }
+
+    def list_scenarios(self) -> Dict[str, Any]:
+        """Return metadata for all 4 deterministic demonstration fixtures."""
+        return {
+            "count": len(DEMO_SCENARIOS_METADATA),
+            "disclaimer": (
+                "Deterministic demonstration fixtures clearly labeled as demo/simulation scenarios. "
+                "NOT scientific validation cases and must NOT be presented as measured real-world performance evidence."
+            ),
+            "scenarios": DEMO_SCENARIOS_METADATA,
+        }
+
+    def run_scenario(self, scenario_id: str) -> Dict[str, Any]:
+        """Run a deterministic demonstration fixture through the authoritative operational risk pipeline."""
+        df_scenario, meta = generate_scenario_dataframe(scenario_id)
+        res = self.risk_engine.process_forecast_dataframe(
+            df_forecast=df_scenario,
+            location_id=meta["location_id"],
+            forecast_source="NOAA_GEFS_SIMULATION_FIXTURE",
+            grid_resolution="0.25°",
+            target_lead_hours=meta.get("lead_hours"),
+        )
+        data = res.to_dict()
+        data["scenario_meta"] = meta
+        return data
 
     def get_forecast_risk(
         self,

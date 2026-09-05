@@ -1,43 +1,35 @@
-"""
-Builder 2 Model Inference Adapter for Veyra V2.
+"""Builder 2 HTTP & Local Model Inference Adapter for Veyra.
 
-Adapts Veyra V2's ForecastIntelligenceService (LightGBM + Platt Sigmoid Calibration)
-to conform to Builder 1's BaseModelService interface, supporting both in-process
-execution and HTTP remote gateway execution.
-"""
+Communicates with Builder 2 authoritative ForecastIntelligenceService
+over HTTP/REST (default: http://localhost:8001/api/forecast-risk) or via
+in-process service when api_url is empty.
 
+Receives calibrated bust probabilities, operational risk tiers, reliability indices,
+structural overconfidence, OOD scores, trajectory stability, analytical failure fingerprints,
+and physical risk drivers from the V3 Benchmark Challenger (or V2 Champion via rollback).
+"""
 import json
 import logging
 import os
-import urllib.error
-import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
+import urllib.request
+import urllib.error
 import numpy as np
 import pandas as pd
 
-try:
-    from backend.app.schemas.prediction import ReasonCode
-except (ImportError, ModuleNotFoundError):
-    from enum import Enum
-    class ReasonCode(str, Enum):  # type: ignore
-        SUCCESS = "SUCCESS"
-        MODEL_NOT_READY = "MODEL_NOT_READY"
-        MODEL_UNAVAILABLE = "MODEL_UNAVAILABLE"
-        FEATURES_NOT_READY = "FEATURES_NOT_READY"
-        INTERNAL_ERROR = "INTERNAL_ERROR"
-        QC_FAILED = "QC_FAILED"
-
+from backend.app.core.config import settings
+from backend.app.schemas.prediction import ReasonCode
 from backend.app.services.base import BaseModelService, FeatureResult, ModelResult
 
 logger = logging.getLogger(__name__)
 
 
 class Builder2ModelAdapter(BaseModelService):
-    """Production model adapter wrapping Veyra V2 ForecastIntelligenceService.
+    """Production model adapter wrapping Veyra ForecastIntelligenceService.
 
-    Uses the verified veyra-v2-champion-lightgbm model with Platt Sigmoid calibration
-    at the calibrated decision threshold of 0.060.
+    Uses the verified V3 Benchmark Challenger (or V2 Champion via rollback) with
+    calibrated probability estimation at the decision threshold of 0.060.
     """
 
     def __init__(
@@ -45,36 +37,43 @@ class Builder2ModelAdapter(BaseModelService):
         api_url: Optional[str] = None,
         model_dir: Optional[Union[str, Path]] = None,
         aggregation_method: str = "max",
-        timeout_seconds: float = 10.0,
+        timeout_seconds: float = 30.0,
+        model_version: Optional[str] = None,
     ):
-        self.api_url = (api_url or os.getenv("BUILDER2_API_URL") or os.getenv("BUILDER2_URL", "http://localhost:8001")).rstrip("/")
+        if api_url is None:
+            self.api_url = (os.getenv("BUILDER2_API_URL") or getattr(settings, "BUILDER2_API_URL", None) or os.getenv("BUILDER2_URL", "http://localhost:8001")).rstrip("/")
+        else:
+            self.api_url = api_url.rstrip("/") if api_url else ""
+            
+        self.use_http = bool(self.api_url)
         self.timeout_seconds = timeout_seconds
         self.aggregation_method = aggregation_method
-        self.model_version: str = "veyra-v2-champion-lightgbm"
-        self.threshold: float = 0.060
+        
+        env_version = os.getenv("VEYRA_MODEL_VERSION", "v3").strip().lower()
+        self.requested_version = (model_version or env_version).strip().lower()
+        
+        if self.requested_version == "v2":
+            self.model_version: str = "veyra-v2-champion-lightgbm"
+            self.decision_threshold: float = 0.060
+        else:
+            self.model_version: str = "veyra-v3-benchmark-lightgbm"
+            self.decision_threshold: float = 0.060
+            
+        self.threshold: float = self.decision_threshold
         self.is_ready: bool = True
-        self.service = None
-
-        # If HTTP URL is configured, use HTTP; otherwise fallback to local service if available
-        if not self.api_url:
-            self._initialize_local_service(model_dir)
-
-    def _initialize_local_service(self, model_dir: Optional[Union[str, Path]] = None) -> None:
-        """Attempt to load in-process V2 ForecastIntelligenceService."""
-        try:
-            from models.forecast_intelligence_service import ForecastIntelligenceService
-            self.service = ForecastIntelligenceService(model_dir=model_dir)
-            self.model_version = self.service.model_version
-            self.threshold = float(self.service.operational_threshold)
-            self.is_ready = True
-            logger.info("Builder2ModelAdapter successfully loaded in-process V2 champion '%s'", self.model_version)
-        except Exception as exc:
-            logger.warning("Builder2ModelAdapter could not load in-process V2 artifacts: %s", exc)
-            self.service = None
-            self.is_ready = False
+        
+        if not self.use_http:
+            try:
+                from models.forecast_intelligence_service import ForecastIntelligenceService
+                self.service = ForecastIntelligenceService(model_dir=model_dir, version=self.requested_version)
+                self.is_ready = True
+            except Exception as exc:
+                logger.warning(f"Could not initialize local ForecastIntelligenceService: {exc}")
+                self.service = None
+                self.is_ready = False
 
     def predict(self, feature_result: FeatureResult) -> ModelResult:
-        """Compute calibrated forecast-bust probability using V2 champion (via HTTP or in-process)."""
+        """Compute calibrated forecast-bust probability via Builder 2 HTTP or Local Service."""
         if not feature_result.is_ready or feature_result.error:
             return ModelResult(
                 probability=None,
@@ -84,50 +83,53 @@ class Builder2ModelAdapter(BaseModelService):
                 error=feature_result.error or "Features not ready for model inference",
             )
 
-        # Extract forecast rows
-        forecast_rows = (
+        matrix_rows = (
             feature_result.metadata.get("forecast_dataframe_rows")
             or feature_result.metadata.get("feature_matrix_rows")
         )
-        if not forecast_rows:
-            if feature_result.features:
-                forecast_rows = [feature_result.features]
-            else:
-                return ModelResult(
-                    probability=None,
-                    model_version=self.model_version,
-                    is_ready=False,
-                    metadata={"status": ReasonCode.FEATURES_NOT_READY.value},
-                    error="FeatureResult contains no feature data",
-                )
-
-        if self.api_url:
-            return self._predict_http(forecast_rows, feature_result.location)
-        elif self.service is not None:
-            return self._predict_local(pd.DataFrame(forecast_rows))
+        if matrix_rows and isinstance(matrix_rows, list):
+            forecast_data = matrix_rows
+        elif feature_result.features:
+            forecast_data = [feature_result.features]
         else:
             return ModelResult(
                 probability=None,
                 model_version=self.model_version,
                 is_ready=False,
-                metadata={"status": ReasonCode.MODEL_UNAVAILABLE.value},
-                error="Builder 2 V2 model service is unavailable",
+                metadata={"status": ReasonCode.FEATURES_NOT_READY.value},
+                error="FeatureResult contains no feature data",
             )
 
-    def _predict_http(self, forecast_rows: list, location: Optional[str]) -> ModelResult:
-        location_id = location or "delhi"
+        if not self.use_http:
+            if not self.is_ready or self.service is None:
+                return ModelResult(
+                    probability=None,
+                    model_version=self.model_version,
+                    is_ready=False,
+                    metadata={"status": ReasonCode.MODEL_UNAVAILABLE.value},
+                    error="Local ForecastIntelligenceService unavailable or uninitialized",
+                )
+            df_features = pd.DataFrame(forecast_data)
+            return self._predict_local(df_features)
+
+        try:
+            from backend.app.services.location_service import get_location_registry
+            location_id = get_location_registry().resolve_canonical_id(feature_result.location) or feature_result.location or "delhi"
+        except Exception:
+            location_id = str(feature_result.location or "delhi").strip().lower()
+
         payload = {
-            "forecast_data": forecast_rows,
+            "forecast_data": forecast_data,
             "location_id": location_id,
             "forecast_source": "NOAA_GEFS",
         }
 
         endpoint_url = f"{self.api_url}/api/forecast-risk"
-        req_data = json.dumps(payload, default=str).encode("utf-8")
+        req_data = json.dumps(payload).encode("utf-8")
         http_req = urllib.request.Request(
             endpoint_url,
             data=req_data,
-            headers={"Content-Type": "application/json", "User-Agent": "VeyraBuilder1/2.0"},
+            headers={"Content-Type": "application/json", "User-Agent": "VeyraBuilder1/3.0"},
             method="POST",
         )
 
@@ -174,6 +176,13 @@ class Builder2ModelAdapter(BaseModelService):
             model_ver = resp_json.get("model_version", self.model_version)
             thresh = float(resp_json.get("decision_threshold", self.threshold))
 
+            trust_horizon_obj = resp_json.get("operational_trust_horizon") or {}
+            op_trust_hours = trust_horizon_obj.get("operational_trust_horizon_hours")
+            guidance_obj = resp_json.get("decision_guidance") or {}
+            decision_mode_val = guidance_obj.get("decision_mode") or top_f.get("decision_mode")
+            within_trust_val = top_f.get("within_trust_horizon")
+            service_tag = "Builder2_HTTP_V2" if "v2" in model_ver.lower() else "Builder2_HTTP_V3"
+
             metadata: Dict[str, Any] = {
                 "status": ReasonCode.SUCCESS.value,
                 "model_version": model_ver,
@@ -185,8 +194,12 @@ class Builder2ModelAdapter(BaseModelService):
                 "stability_index": top_f.get("stability_index", 100.0),
                 "failure_fingerprint": top_f.get("failure_fingerprint", "NOMINAL"),
                 "uncertainty_pct": top_f.get("uncertainty_pct", 3.37),
-                "dominant_risk_drivers": top_f.get("dominant_risk_drivers", []),
-                "backend_service": "Builder2_HTTP_V2",
+                "revision": top_f.get("revision"),
+                "dominant_risk_drivers": top_f.get("dominant_risk_drivers") or [],
+                "decision_mode": decision_mode_val,
+                "within_trust_horizon": within_trust_val,
+                "operational_trust_horizon_hours": op_trust_hours,
+                "backend_service": service_tag,
             }
 
             return ModelResult(
@@ -224,7 +237,7 @@ class Builder2ModelAdapter(BaseModelService):
                     model_version=self.model_version,
                     is_ready=False,
                     metadata={"status": ReasonCode.INTERNAL_ERROR.value},
-                    error="V2 intelligence service returned zero results",
+                    error="ForecastIntelligenceService returned zero results",
                 )
 
             probabilities = [r.bust_probability for r in results]
@@ -240,9 +253,11 @@ class Builder2ModelAdapter(BaseModelService):
                     probability=None,
                     model_version=self.model_version,
                     is_ready=False,
-                    metadata={"status": ReasonCode.INTERNAL_ERROR.value},
+                    metadata={"status": ReasonCode.QC_FAILED.value},
                     error=f"Model computed invalid probability: {agg_prob}",
                 )
+
+            service_tag = "Builder2_Local_V2" if "v2" in self.model_version.lower() else "Builder2_Local_V3"
 
             metadata: Dict[str, Any] = {
                 "status": ReasonCode.SUCCESS.value,
@@ -255,8 +270,11 @@ class Builder2ModelAdapter(BaseModelService):
                 "stability_index": r_top.stability_index,
                 "failure_fingerprint": r_top.provenance.get("failure_fingerprint", "NOMINAL"),
                 "uncertainty_pct": r_top.provenance.get("prediction_uncertainty_pct", 3.37),
-                "dominant_risk_drivers": [d.to_dict() for d in r_top.dominant_risk_drivers],
-                "backend_service": "Builder2_Local_V2",
+                "dominant_risk_drivers": [d.to_dict() if hasattr(d, "to_dict") else d for d in r_top.dominant_risk_drivers],
+                "decision_mode": getattr(r_top, "decision_mode", None) or r_top.provenance.get("decision_mode"),
+                "within_trust_horizon": getattr(r_top, "within_trust_horizon", None) or r_top.provenance.get("within_trust_horizon"),
+                "operational_trust_horizon_hours": r_top.provenance.get("operational_trust_horizon_hours", 0),
+                "backend_service": service_tag,
             }
 
             return ModelResult(
@@ -266,7 +284,7 @@ class Builder2ModelAdapter(BaseModelService):
                 metadata=metadata,
             )
         except Exception as exc:
-            logger.error("V2 local model inference failed: %s", exc)
+            logger.error("Local model inference failed: %s", exc)
             return ModelResult(
                 probability=None,
                 model_version=self.model_version,

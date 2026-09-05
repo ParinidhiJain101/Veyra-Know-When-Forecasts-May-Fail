@@ -80,7 +80,7 @@ def test_agent_full_pipeline_mock_injection():
 
     assert response.location == "Tokyo"
     assert response.bust_probability == 0.35
-    assert response.risk_level == RiskLevel.MEDIUM
+    assert response.risk_level == RiskLevel.ELEVATED
     assert response.trust_state == TrustState.HIGH_CONFIDENCE
     assert response.abstain is False
     assert response.model_version == "prototype-gbm-v1"
@@ -216,15 +216,14 @@ def test_agent_exception_resilience():
 
 
 def test_agent_risk_level_thresholds():
-    """Test categorical risk level mapping across probability intervals."""
+    """Test categorical risk level mapping across calibrated probability intervals."""
     from backend.app.safety.abstention import SafetyEvaluator
 
     evaluator = SafetyEvaluator()
-    assert evaluator._map_risk_level(0.05) == RiskLevel.LOW
-    assert evaluator._map_risk_level(0.19) == RiskLevel.LOW
-    assert evaluator._map_risk_level(0.20) == RiskLevel.MEDIUM
-    assert evaluator._map_risk_level(0.49) == RiskLevel.MEDIUM
-    assert evaluator._map_risk_level(0.50) == RiskLevel.HIGH
-    assert evaluator._map_risk_level(0.74) == RiskLevel.HIGH
-    assert evaluator._map_risk_level(0.75) == RiskLevel.CRITICAL
-    assert evaluator._map_risk_level(0.99) == RiskLevel.CRITICAL
+    assert evaluator._map_risk_level(0.00) == RiskLevel.LOW
+    assert evaluator._map_risk_level(0.059) == RiskLevel.LOW
+    assert evaluator._map_risk_level(0.060) == RiskLevel.ELEVATED
+    assert evaluator._map_risk_level(0.350) == RiskLevel.ELEVATED
+    assert evaluator._map_risk_level(0.599) == RiskLevel.ELEVATED
+    assert evaluator._map_risk_level(0.600) == RiskLevel.CRITICAL
+    assert evaluator._map_risk_level(0.990) == RiskLevel.CRITICAL

@@ -115,14 +115,39 @@ class SafetyEvaluator(BaseSafetyService):
         # Map categorical risk level
         risk_level = self._map_risk_level(probability)
 
-        # Default confident prediction (future OOD evaluation will plug in here)
+        # Check OOD and epistemic abstention signals from model result metadata
+        m_meta = model_result.metadata or {}
+        ood_score = m_meta.get("ood_score", m_meta.get("ood_distance", 0.0))
+        decision_mode = m_meta.get("decision_mode")
+        data_status = m_meta.get("data_status")
+
+        if decision_mode == "ABSTAIN" or (isinstance(ood_score, (int, float)) and ood_score >= 40.0) or data_status == "ABSTAINED":
+            reason = ReasonCode.OOD_ABSTAIN.value if (isinstance(ood_score, (int, float)) and ood_score >= 40.0) else ReasonCode.MODEL_NOT_READY.value
+            return SafetyAssessment(
+                bust_probability=None,
+                risk_level=None,
+                trust_state=TrustState.ABSTAINED,
+                abstain=True,
+                reason_codes=[reason],
+                metadata=m_meta,
+            )
+
+        # Assign trust state based on confidence index
+        confidence_index = m_meta.get("confidence_index", 100.0)
+        if isinstance(confidence_index, (int, float)) and confidence_index < 50.0:
+            trust_state = TrustState.LOW_CONFIDENCE
+        elif isinstance(confidence_index, (int, float)) and confidence_index < 80.0:
+            trust_state = TrustState.MODERATE_CONFIDENCE
+        else:
+            trust_state = TrustState.HIGH_CONFIDENCE
+
         return SafetyAssessment(
             bust_probability=probability,
             risk_level=risk_level,
-            trust_state=TrustState.HIGH_CONFIDENCE,
+            trust_state=trust_state,
             abstain=False,
             reason_codes=[ReasonCode.SUCCESS.value],
-            metadata=model_result.metadata,
+            metadata=m_meta,
         )
 
     @staticmethod
